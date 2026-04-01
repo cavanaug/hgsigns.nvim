@@ -10,9 +10,11 @@ local api = helpers.api
 local test_config = helpers.test_config
 local clear = helpers.clear
 local setup_test_repo = helpers.setup_test_repo
+local setup_test_hg_repo = helpers.setup_test_hg_repo
 local eq = helpers.eq
 local expectf = helpers.expectf
 local git = helpers.git
+local hg = helpers.hg
 local scratch = helpers.scratch
 local write_to_file = helpers.write_to_file
 
@@ -222,6 +224,126 @@ describe('actions', function()
       assert(not line:find('\27', 1, true), ('unexpected ANSI escape in line: %q'):format(line))
     end
   end)
+
+  it('normalizes mercurial relative revisions without forcing HEAD semantics', function()
+    local result = exec_lua(function()
+      local util = require('hgsigns.util')
+      return {
+        hg_tilde = util.norm_base('~', 'hg'),
+        hg_parent = util.norm_base('^', 'hg'),
+        hg_prev = util.norm_base('~1', 'hg'),
+        hg_explicit = util.norm_base('.~1', 'hg'),
+        git_prev = util.norm_base('~1', 'git'),
+      }
+    end)
+
+    eq('.~', result.hg_tilde)
+    eq('.^', result.hg_parent)
+    eq('.~1', result.hg_prev)
+    eq('.~1', result.hg_explicit)
+    eq('HEAD~1', result.git_prev)
+  end)
+
+  it(
+    'show_commit renders mercurial metadata and git-style patch headers for relative revisions',
+    function()
+      setup_test_hg_repo()
+      write_to_file(test_file, { 'This', 'IS', 'a', 'file' })
+      hg('commit', '-A', '-m', 'second commit', '-u', 'tester')
+
+      edit(test_file)
+      check({
+        status = { head = 'default', added = 0, changed = 0, removed = 0 },
+        signs = {},
+      })
+
+      local result = exec_lua(function()
+        local async = require('hgsigns.async')
+        local commit_buf = async
+          .run(function()
+            return require('hgsigns.actions.show_commit')('.~1', 'edit')
+          end)
+          :wait(2000)
+
+        return {
+          name = vim.api.nvim_buf_get_name(commit_buf),
+          lines = vim.api.nvim_buf_get_lines(commit_buf, 0, -1, false),
+        }
+      end)
+
+      eq(true, result.name:find('^hgsigns://', 1) ~= nil)
+      eq(true, result.lines[1]:match('^commit %x+$') ~= nil)
+      eq(true, vim.tbl_contains(result.lines, 'summary init commit'))
+      eq(true, vim.tbl_contains(result.lines, 'diff --git a/dummy.txt b/dummy.txt'))
+      eq(true, vim.tbl_contains(result.lines, '--- /dev/null'))
+      eq(true, vim.tbl_contains(result.lines, '+++ b/dummy.txt'))
+
+      for _, line in ipairs(result.lines) do
+        assert(not line:find('\27', 1, true), ('unexpected ANSI escape in line: %q'):format(line))
+      end
+    end
+  )
+
+  it(
+    'diffthis accepts mercurial relative revisions for nested files from a subdirectory cwd',
+    function()
+      helpers.hg_init_scratch()
+
+      local relpath = 'sub/dir/dummy.txt'
+      local file = scratch .. '/' .. relpath
+      write_to_file(file, { 'one', 'two', 'three' })
+      hg('add', file)
+      hg('commit', '-m', 'init commit', '-u', 'tester')
+      write_to_file(file, { 'one', 'TWO', 'three' })
+      hg('commit', '-m', 'second commit', '-u', 'tester', file)
+
+      helpers.api.nvim_command('cd ' .. helpers.fn.fnameescape(scratch .. '/sub'))
+      edit(file)
+      check({
+        status = { head = 'default', added = 0, changed = 0, removed = 0 },
+        signs = {},
+      })
+
+      exec_lua(function()
+        local async = require('hgsigns.async')
+        async.run(require('hgsigns.actions.diffthis').diffthis, '.~1', {}):wait(2000)
+      end)
+
+      eq(
+        true,
+        exec_lua(function()
+          return vim.wait(5000, function()
+            for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+              local buf = vim.api.nvim_win_get_buf(win)
+              if vim.wo[win].diff and vim.api.nvim_buf_get_name(buf):find('^hgsigns://', 1) then
+                return true
+              end
+            end
+            return false
+          end)
+        end)
+      )
+
+      local result = exec_lua(function()
+        for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+          local buf = vim.api.nvim_win_get_buf(win)
+          local name = vim.api.nvim_buf_get_name(buf)
+          if vim.wo[win].diff and name:find('^hgsigns://', 1) then
+            return {
+              name = name,
+              line = vim.api.nvim_buf_get_lines(buf, 1, 2, false)[1],
+              diff = vim.wo[win].diff,
+            }
+          end
+        end
+      end)
+
+      eq(true, type(result) == 'table')
+      eq(true, result.name:find('//.~1:sub/dir/dummy.txt', 1, true) ~= nil)
+      eq(true, result.diff)
+      eq('two', result.line)
+    end
+  )
 
   it('does not emit duplicate HgsignsUpdate events for stage_hunk', function()
     setup_test_repo()

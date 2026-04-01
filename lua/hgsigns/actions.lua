@@ -64,20 +64,80 @@ local function async_run(callback, func, ...)
   return task
 end
 
+--- @return Hgsigns.Repo?
+local function get_current_repo()
+  local bcache = cache[current_buf()]
+  return bcache and bcache.git_obj.repo or nil
+end
+
+--- @param args string[]
+--- @param spec? Hgsigns.Git.JobSpec
+--- @return string[]
+local function systemlist(args, spec)
+  return async
+    .run(function()
+      local stdout = require('hgsigns.git.cmd')(args, spec)
+      return stdout
+    end)
+    :wait(5000)
+end
+
+--- @param ret string[]
+--- @param seen table<string,true>
+--- @param value string?
+local function add_completion(ret, seen, value)
+  if not value or value == '' or seen[value] then
+    return
+  end
+  seen[value] = true
+  ret[#ret + 1] = value
+end
+
 --- @param arglead string
 --- @return string[]
 local function complete_heads(arglead)
-  --- @type string[]
-  local all =
-    vim.fn.systemlist({ 'git', 'rev-parse', '--symbolic', '--branches', '--tags', '--remotes' })
-  return vim.tbl_filter(
-    --- @param x string
-    --- @return boolean
-    function(x)
+  local repo = get_current_repo()
+
+  if repo and repo.vcs == 'hg' then
+    local all = {} --- @type string[]
+    local seen = {} --- @type table<string,true>
+    add_completion(all, seen, '.')
+    add_completion(all, seen, '.^')
+    add_completion(all, seen, '.~1')
+
+    local spec = {
+      ignore_error = true,
+      cwd = repo.toplevel,
+      vcs = 'hg',
+    }
+
+    for _, line in ipairs(systemlist({ 'heads', '--template', '{node|short}\n' }, spec)) do
+      add_completion(all, seen, line)
+    end
+    for _, line in ipairs(systemlist({ 'branches', '--template', '{branch}\n' }, spec)) do
+      add_completion(all, seen, line)
+    end
+    for _, line in ipairs(systemlist({ 'bookmarks', '--template', '{bookmark}\n' }, spec)) do
+      add_completion(all, seen, line)
+    end
+    for _, line in ipairs(systemlist({ 'tags', '--template', '{tag}\n' }, spec)) do
+      add_completion(all, seen, line)
+    end
+
+    return vim.tbl_filter(function(x)
       return vim.startswith(x, arglead)
-    end,
-    all
-  )
+    end, all)
+  end
+
+  local all = systemlist({ 'rev-parse', '--symbolic', '--branches', '--tags', '--remotes' }, {
+    ignore_error = true,
+    cwd = repo and repo.toplevel or nil,
+    vcs = 'git',
+  })
+
+  return vim.tbl_filter(function(x)
+    return vim.startswith(x, arglead)
+  end, all)
 end
 
 --- Detach Hgsigns from all buffers it is attached to.
@@ -727,17 +787,18 @@ end
 --- @param callback? fun(err?: string)
 function M.change_base(base, global, callback)
   async_run(callback, function()
-    base = util.norm_base(base)
+    local bufnr = current_buf()
+    local bcache = cache[bufnr]
+    local vcs = bcache and bcache.git_obj.repo.vcs or 'git'
+    base = util.norm_base(base, vcs)
 
     if global then
       config.base = base
 
-      for _, bcache in pairs(cache) do
-        update_buf_base(bcache, base)
+      for _, entry in pairs(cache) do
+        update_buf_base(entry, base)
       end
     else
-      local bufnr = current_buf()
-      local bcache = cache[bufnr]
       if not bcache then
         return
       end

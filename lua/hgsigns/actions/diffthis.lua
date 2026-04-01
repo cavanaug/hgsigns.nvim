@@ -20,7 +20,7 @@ local M = {}
 --- @param relpath string?
 local function bufread(bufnr, dbufnr, base, relpath)
   local bcache = assert(cache[bufnr])
-  base = util.norm_base(base)
+  base = util.norm_base(base, bcache.git_obj.repo.vcs)
   local text --- @type string[]
   if base == bcache.git_obj.revision then
     text = assert(bcache.compare_text)
@@ -62,7 +62,7 @@ end
 local function bufwrite(bufnr, dbufnr, base)
   local bcache = assert(cache[bufnr])
   local buftext = util.buf_lines(dbufnr)
-  base = util.norm_base(base)
+  base = util.norm_base(base, bcache.git_obj.repo.vcs)
   bcache.git_obj:lock(function()
     bcache.git_obj:stage_lines(buftext)
   end)
@@ -88,7 +88,7 @@ end
 --- @return integer? bufnr Buffer number
 local function create_revision_buf(bufnr, base, relpath)
   local bcache = assert(cache[bufnr])
-  base = util.norm_base(base)
+  base = util.norm_base(base, bcache.git_obj.repo.vcs)
 
   local bufname = bcache:get_rev_bufname(base, relpath)
 

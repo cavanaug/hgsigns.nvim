@@ -10,6 +10,7 @@ describe('git locale', function()
   before_each(function()
     helpers.clear()
     helpers.setup_path()
+    helpers.chdir_tmp()
   end)
 
   after_each(function()
@@ -78,6 +79,37 @@ describe('git locale', function()
       end
     end
     eq(true, saw_hg)
+
+    local completion_result = helpers.exec_lua(function()
+      local before = #_G.hgsigns_git_envs
+      local complete = require('hgsigns.actions')._get_cmp_func('show_commit')
+      local items = complete('.')
+      local calls = {}
+      for i = before + 1, #_G.hgsigns_git_envs do
+        calls[#calls + 1] = _G.hgsigns_git_envs[i]
+      end
+      return {
+        items = items,
+        calls = calls,
+      }
+    end)
+
+    local saw_completion_hg = false
+    local saw_completion_git = false
+    for _, item in ipairs(completion_result.calls) do
+      if item.vcs == 'hg' then
+        saw_completion_hg = true
+        eq('1', item.env.HGPLAIN)
+        eq('C', item.env.LC_ALL)
+        eq('C', item.env.LANGUAGE)
+      elseif item.vcs == 'git' then
+        saw_completion_git = true
+      end
+    end
+
+    eq(true, saw_completion_hg)
+    eq(false, saw_completion_git)
+    eq(true, vim.tbl_contains(completion_result.items, '.'))
 
     local saw_hg_config = false
     for _, line in ipairs(debug_messages()) do

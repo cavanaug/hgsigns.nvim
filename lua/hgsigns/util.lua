@@ -266,14 +266,21 @@ function M.strip_cr(xs0)
   return xs
 end
 
+--- @param vcs? 'git'|'hg'
+--- @return string
+function M.default_revision(vcs)
+  return vcs == 'hg' and '.' or 'HEAD'
+end
+
 --- @param base? string
+--- @param vcs? 'git'|'hg'
 --- @return string?
-function M.norm_base(base)
+function M.norm_base(base, vcs)
   if base == ':0' then
     return
   end
   if base and base:sub(1, 1):match('[~\\^]') then
-    base = 'HEAD' .. base
+    base = M.default_revision(vcs) .. base
   end
   return base
 end

@@ -40,7 +40,7 @@ M.Obj = Obj
 --- @param revision? string
 --- @return string? err
 function Obj:change_revision(revision)
-  self.revision = util.norm_base(revision)
+  self.revision = util.norm_base(revision, self.repo.vcs)
   return self:refresh()
 end
 
@@ -278,7 +278,7 @@ function Obj.new(file, revision, encoding, gitdir, toplevel)
   -- When passing gitdir and toplevel, suppress stderr when resolving the file
   local silent = gitdir ~= nil and toplevel ~= nil
 
-  revision = util.norm_base(revision)
+  revision = util.norm_base(revision, repo.vcs)
 
   local info, err2 = repo:file_info(file, revision)
 
