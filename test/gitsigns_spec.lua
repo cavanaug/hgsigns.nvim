@@ -212,12 +212,8 @@ describe('hgsigns (with screen)', function()
 
         -- Check all keymaps get set
         match_lines(res, {
-          n('n  mhS         *@<Cmd>lua require"hgsigns".stage_buffer()<CR>'),
-          n('n  mhU         *@<Cmd>lua require"hgsigns".reset_buffer_index()<CR>'),
           n('n  mhp         *@<Cmd>lua require"hgsigns".preview_hunk()<CR>'),
           n('n  mhr         *@<Cmd>lua require"hgsigns".reset_hunk()<CR>'),
-          n('n  mhs         *@<Cmd>lua require"hgsigns".stage_hunk()<CR>'),
-          n('n  mhu         *@<Cmd>lua require"hgsigns".undo_stage_hunk()<CR>'),
         })
       end)
     end)
@@ -827,28 +823,6 @@ describe('hgsigns (with screen)', function()
         })
       end)
 
-      it('can add untracked files to the index', function()
-        setup_hgsigns(config)
-
-        edit(newfile)
-        feed('iline<esc>')
-        check({ status = { head = 'main' } })
-
-        command('write')
-
-        check({
-          status = { head = 'main', added = 1, changed = 0, removed = 0 },
-          signs = { untracked = 1 },
-        })
-
-        feed('mhs') -- Stage the file (add file to index)
-
-        check({
-          status = { head = 'main', added = 0, changed = 0, removed = 0 },
-          signs = {},
-        })
-      end)
-
       it('can manually attach untracked files (#1026)', function()
         config.attach_to_untracked = false
         setup_hgsigns(config)
@@ -867,13 +841,6 @@ describe('hgsigns (with screen)', function()
         check({
           status = { head = 'main', added = 1, changed = 0, removed = 0 },
           signs = { untracked = 1 },
-        })
-
-        command('Hgsigns stage_buffer')
-
-        check({
-          status = { head = 'main', added = 0, changed = 0, removed = 0 },
-          signs = {},
         })
       end)
 
@@ -928,51 +895,6 @@ describe('hgsigns (with screen)', function()
         command('Hgsigns detach')
 
         check({ status = {}, signs = {} })
-      end)
-
-      it('can stages file with merge conflicts', function()
-        setup_hgsigns(config)
-        command('set signcolumn=yes')
-
-        -- Edit a file and commit it on main branch
-        edit(test_file)
-        check({ status = { head = 'main', added = 0, changed = 0, removed = 0 } })
-        feed('iedit')
-        check({ status = { head = 'main', added = 0, changed = 1, removed = 0 } })
-        command('write')
-        command('bwipe')
-
-        git('add', test_file)
-        git('commit', '-m', 'commit on main')
-
-        -- Create a branch, remove last commit, edit file again
-        git('checkout', '-B', 'abranch')
-        git('reset', '--hard', 'HEAD~1')
-
-        edit(test_file)
-        check({ status = { head = 'abranch', added = 0, changed = 0, removed = 0 } })
-        feed('idiff')
-        check({ status = { head = 'abranch', added = 0, changed = 1, removed = 0 } })
-        command('write')
-        command('bwipe')
-
-        git('add', test_file)
-        git('commit', '-m', 'commit on branch')
-        git('rebase', 'main')
-
-        -- test_file should have a conflict
-        edit(test_file)
-        check({
-          status = { head = 'HEAD(rebasing)', added = 6, changed = 0, removed = 0 },
-          signs = { added = 6 },
-        })
-
-        helpers.stage_hunk()
-
-        check({
-          status = { head = 'HEAD(rebasing)', added = 3, changed = 0, removed = 0 },
-          signs = { added = 3 },
-        })
       end)
 
       it('handle files with spaces', function()

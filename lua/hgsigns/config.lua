@@ -60,8 +60,6 @@
 --- @field diffthis Hgsigns.DiffthisOpts
 --- @field base? string
 --- @field signs table<Hgsigns.SignType,Hgsigns.SignConfig>
---- @field signs_staged table<Hgsigns.SignType,Hgsigns.SignConfig>
---- @field signs_staged_enable boolean
 --- @field count_chars table<string|integer,string>
 --- @field signcolumn boolean
 --- @field numhl boolean
@@ -69,7 +67,6 @@
 --- @field culhl boolean
 --- @field show_deleted boolean
 --- @field sign_priority integer
---- @field _on_attach_pre? fun(bufnr: integer, callback: fun(_: table))
 --- @field on_attach? fun(bufnr: integer): boolean?
 --- @field watch_gitdir { enable: boolean, follow_files: boolean }
 --- @field max_file_length integer
@@ -82,10 +79,8 @@
 --- @field preview_config vim.api.keyset.win_config
 --- @field auto_attach boolean
 --- @field attach_to_untracked boolean
---- @field worktrees {toplevel: string, gitdir: string}[]
 --- @field word_diff boolean
 --- @field trouble boolean
---- @field gh boolean
 --- -- Undocumented
 --- @field _refresh_staged_on_update boolean
 --- @field _threaded_diff boolean
@@ -250,82 +245,6 @@ M.schema = {
         • `HgsignsAddCul `(for signs when `config.culhl == true`)
 
       See |hgsigns-highlight-groups|.
-    ]],
-  },
-
-  signs_staged = {
-    type = 'table',
-    deep_extend = true,
-    default = {
-      add = { text = '┃' },
-      change = { text = '┃' },
-      delete = { text = '▁' },
-      topdelete = { text = '▔' },
-      changedelete = { text = '~' },
-    },
-    default_help = [[{
-      add          = { text = '┃' },
-      change       = { text = '┃' },
-      delete       = { text = '▁' },
-      topdelete    = { text = '▔' },
-      changedelete = { text = '~' },
-    }]],
-    description = [[
-    Configuration for signs of staged hunks.
-
-    See |hgsigns-config-signs|.
-    ]],
-  },
-
-  signs_staged_enable = {
-    type = 'boolean',
-    default = true,
-    description = [[
-    Show signs for staged hunks.
-
-    When enabled the signs defined in |git-config-signs_staged| are used.
-    ]],
-  },
-
-  worktrees = {
-    type = 'table',
-    default = {},
-    description = [[
-      Detached working trees.
-
-      Array of tables with the keys `gitdir` and `toplevel`.
-
-      If normal attaching fails, then each entry in the table is attempted
-      with the work tree details set.
-
-      Example: >lua
-        worktrees = {
-          {
-            toplevel = vim.env.HOME,
-            gitdir = vim.env.HOME .. '/projects/dotfiles/.git'
-          }
-        }
-    ]],
-  },
-
-  _on_attach_pre = {
-    type = 'function',
-    description = [[
-      Asynchronous hook called before attaching to a buffer. Mainly used to
-      configure detached worktrees.
-
-      This callback must call its callback argument. The callback argument can
-      accept an optional table argument with the keys: 'gitdir' and 'toplevel'.
-
-      Example: >lua
-      on_attach_pre = function(bufnr, callback)
-        ...
-        callback {
-          gitdir = ...,
-          toplevel = ...
-        }
-      end
-      <
     ]],
   },
 
@@ -755,15 +674,6 @@ M.schema = {
     description = [[
       When using setqflist() or setloclist(), open Trouble instead of the
       quickfix/location list window.
-    ]],
-  },
-
-  gh = {
-    type = 'boolean',
-    default = false,
-    description = [[
-      Enable GitHub integration. This allows the following features:
-      • `:Hgsigns blame_line` will show PR numbers (with a hyperlink)
     ]],
   },
 

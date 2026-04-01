@@ -1,7 +1,6 @@
 local async = require('hgsigns.async')
 local Hunks = require('hgsigns.hunks')
 local manager = require('hgsigns.manager')
-local message = require('hgsigns.message')
 local util = require('hgsigns.util')
 
 local config = require('hgsigns.config').config
@@ -283,75 +282,6 @@ local function get_range(params)
   return range
 end
 
---- Stage the hunk at the cursor position, or all lines in the
---- given range. If {range} is provided, all lines in the given
---- range are staged. This supports partial-hunks, meaning if a
---- range only includes a portion of a particular hunk, only the
---- lines within the range will be staged.
----
---- Attributes:
---- - {async}
----
---- @param range [integer, integer]? List-like table of two integers making
----   up the line range from which you want to stage the hunks.
----   If running via command line, then this is taken from the
----   command modifiers.
---- @param opts Hgsigns.HunkOpts? Additional options.
---- @param callback? fun(err?: string)
-function M.stage_hunk(range, opts, callback)
-  --- @cast range [integer, integer]?
-
-  opts = opts or {}
-  local bufnr = current_buf()
-  local bcache = cache[bufnr]
-  if not bcache then
-    return
-  end
-
-  if not util.Path.exists(bcache.file) then
-    print('Error: Cannot stage lines. Please add the file to the working tree.')
-    return
-  end
-
-  async_run(callback, function()
-    bcache.git_obj:lock(function()
-      local hunk = bcache:get_hunk(range, opts.greedy ~= false, false)
-
-      local invert = false
-      if not hunk then
-        invert = true
-        hunk = bcache:get_hunk(range, opts.greedy ~= false, true)
-      end
-
-      if not hunk then
-        api.nvim_echo({ { 'No hunk to stage', 'WarningMsg' } }, false, {})
-        return
-      end
-
-      local err = bcache.git_obj:stage_hunks({ hunk }, invert)
-      if err then
-        message.error(err)
-        return
-      end
-
-      if bcache.compare_text then
-        bcache.compare_text = Hunks.apply_to_text(bcache.compare_text, hunk, invert)
-      end
-
-      table.insert(bcache.staged_diffs, hunk)
-    end)
-
-    bcache:invalidate()
-    update(bufnr)
-  end)
-end
-
-M.stage_hunk = mk_repeatable(M.stage_hunk)
-
-C.stage_hunk = function(_, params)
-  M.stage_hunk(get_range(params))
-end
-
 --- @param bufnr integer
 --- @param hunk Hgsigns.Hunk.Hunk
 local function reset_hunk(bufnr, hunk)
@@ -430,122 +360,6 @@ function M.reset_buffer()
   for i = #hunks, 1, -1 do
     reset_hunk(bufnr, hunks[i] --[[@as Hgsigns.Hunk.Hunk]])
   end
-end
-
---- @deprecated use [[hgsigns.stage_hunk()]] on staged signs
---- Undo the last call of stage_hunk().
----
---- Note: only the calls to stage_hunk() performed in the current
---- session can be undone.
----
---- Attributes:
---- - {async}
----
---- @param callback? fun(err?: string)
-function M.undo_stage_hunk(callback)
-  async_run(callback, function()
-    local bufnr = current_buf()
-    local bcache = cache[bufnr]
-    if not bcache then
-      return
-    end
-
-    bcache.git_obj:lock(function()
-      local hunk = table.remove(bcache.staged_diffs)
-      if not hunk then
-        print('No hunks to undo')
-        return
-      end
-
-      local err = bcache.git_obj:stage_hunks({ hunk }, true)
-      if err then
-        message.error(err)
-        return
-      end
-    end)
-
-    bcache:invalidate(true)
-    update(bufnr)
-  end)
-end
-
---- Stage all hunks in current buffer.
----
---- Attributes:
---- - {async}
----
---- @param callback? fun(err?: string)
-function M.stage_buffer(callback)
-  async_run(callback, function()
-    local bufnr = current_buf()
-    local bcache = cache[bufnr]
-    if not bcache then
-      return
-    end
-
-    bcache.git_obj:lock(function()
-      -- Only process files with existing hunks
-      local hunks = bcache.hunks
-      if not hunks or #hunks == 0 then
-        print('No unstaged changes in file to stage')
-        return
-      end
-
-      if not util.Path.exists(bcache.git_obj.file) then
-        print('Error: Cannot stage file. Please add it to the working tree.')
-        return
-      end
-
-      local err = bcache.git_obj:stage_hunks(hunks)
-      if err then
-        message.error(err)
-        return
-      end
-
-      for _, hunk in ipairs(hunks) do
-        if bcache.compare_text then
-          bcache.compare_text = Hunks.apply_to_text(bcache.compare_text, hunk)
-        end
-        table.insert(bcache.staged_diffs, hunk)
-      end
-    end)
-
-    bcache:invalidate()
-    update(bufnr)
-  end)
-end
-
---- Unstage all hunks for current buffer in the index. Note:
---- Unlike [[hgsigns.undo_stage_hunk()]] this doesn't simply undo
---- stages, this runs an `git reset` on current buffers file.
----
---- Attributes:
---- - {async}
----
---- @param callback? fun(err?: string)
-function M.reset_buffer_index(callback)
-  async_run(callback, function()
-    local bufnr = current_buf()
-    local bcache = cache[bufnr]
-    if not bcache then
-      return
-    end
-
-    bcache.git_obj:lock(function()
-      -- `bcache.staged_diffs` won't contain staged changes outside of current
-      -- neovim session so signs added from this unstage won't be complete They will
-      -- however be fixed by gitdir watcher and properly updated We should implement
-      -- some sort of initial population from git diff, after that this function can
-      -- be improved to check if any staged hunks exists and it can undo changes
-      -- using git apply line by line instead of resetting whole file
-      bcache.staged_diffs = {}
-
-      bcache.git_obj:unstage_file()
-    end)
-
-    bcache:invalidate(true)
-    update(bufnr)
-  end)
 end
 
 --- Jump to hunk in the current buffer. If a hunk preview
@@ -1021,17 +835,12 @@ M.get_actions = function()
 
   if hunk then
     vim.list_extend(actions_l, {
-      'stage_hunk',
       'reset_hunk',
       'preview_hunk',
       'select_hunk',
     })
   else
     actions_l[#actions_l + 1] = 'blame_line'
-  end
-
-  if not vim.tbl_isempty(bcache.staged_diffs) then
-    actions_l[#actions_l + 1] = 'undo_stage_hunk'
   end
 
   local actions = {} --- @type table<string,function>

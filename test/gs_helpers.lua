@@ -121,12 +121,8 @@ M.test_config = {
     untracked = { text = '#' },
   },
   on_attach = {
-    { 'n', 'mhs', '<cmd>lua require"hgsigns".stage_hunk()<CR>' },
-    { 'n', 'mhu', '<cmd>lua require"hgsigns".undo_stage_hunk()<CR>' },
     { 'n', 'mhr', '<cmd>lua require"hgsigns".reset_hunk()<CR>' },
     { 'n', 'mhp', '<cmd>lua require"hgsigns".preview_hunk()<CR>' },
-    { 'n', 'mhS', '<cmd>lua require"hgsigns".stage_buffer()<CR>' },
-    { 'n', 'mhU', '<cmd>lua require"hgsigns".reset_buffer_index()<CR>' },
   },
   attach_to_untracked = true,
   update_debounce = 5,

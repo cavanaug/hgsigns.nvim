@@ -79,29 +79,6 @@ local function on_detach(_, bufnr)
   M.detach(bufnr, true)
 end
 
---- @async
---- @param bufnr integer
---- @return string?
---- @return string?
-local function on_attach_pre(bufnr)
-  --- @type string?, string?
-  local gitdir, toplevel
-  if config._on_attach_pre then
-    --- @type {gitdir: string?, toplevel: string?}
-    local res = async.await(2, config._on_attach_pre, bufnr)
-    dprintf('ran on_attach_pre with result %s', vim.inspect(res))
-    if type(res) == 'table' then
-      if type(res.gitdir) == 'string' then
-        gitdir = res.gitdir
-      end
-      if type(res.toplevel) == 'string' then
-        toplevel = res.toplevel
-      end
-    end
-  end
-  return gitdir, toplevel
-end
-
 local setup = Util.once(function()
   manager.setup()
 
@@ -154,12 +131,10 @@ local function get_buf_context(bufnr)
     end
   end
 
-  local gitdir_oap, toplevel_oap = on_attach_pre(bufnr)
-
   return {
     file = rel_path or bufpath,
-    gitdir = gitdir_oap or gitdir_from_bufname,
-    toplevel = toplevel_oap,
+    gitdir = gitdir_from_bufname,
+    toplevel = nil,
     -- Stage buffers always compare against the common ancestor (':1')
     -- :0: index
     -- :1: common ancestor
@@ -304,7 +279,6 @@ end
 --- @param aucmd? string
 M.attach = throttle_async({ hash = 1 }, function(cbuf, ctx, aucmd)
   local __FUNC__ = 'attach'
-  local passed_ctx = ctx ~= nil
 
   setup()
 
@@ -346,16 +320,6 @@ M.attach = throttle_async({ hash = 1 }, function(cbuf, ctx, aucmd)
 
   local revision = ctx.base or config.base
   local git_obj = git.Obj.new(file, revision, encoding, ctx.gitdir, toplevel)
-
-  if not git_obj and not passed_ctx then
-    for _, wt in ipairs(config.worktrees) do
-      git_obj = git.Obj.new(file, revision, encoding, wt.gitdir, wt.toplevel)
-      if git_obj and not git_obj:is_untracked() then
-        dprintf('Using worktree %s', vim.inspect(wt))
-        break
-      end
-    end
-  end
 
   if not git_obj then
     dprint('Empty git obj')

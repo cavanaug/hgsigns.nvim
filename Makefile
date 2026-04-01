@@ -91,7 +91,7 @@ stylua: $(STYLUA)
 $(STYLUA): $(STYLUA_ZIP)
 	unzip $< -d $(dir $@)
 
-LUA_FILES := $(shell git ls-files lua test)
+LUA_FILES := $(shell find lua test -type f -name '*.lua' | sort)
 
 .PHONY: format-check
 format-check: $(STYLUA)
