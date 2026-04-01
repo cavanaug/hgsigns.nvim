@@ -153,7 +153,7 @@ Optional configuration can be passed to the setup function. Here is an example
 with most of the default settings:
 
 ```lua
-require('gitsigns').setup {
+require('hgsigns').setup {
   signs = {
     add          = { text = '┃' },
     change       = { text = '┃' },
@@ -171,16 +171,16 @@ require('gitsigns').setup {
     untracked    = { text = '┆' },
   },
   signs_staged_enable = true,
-  signcolumn = true,  -- Toggle with `:Gitsigns toggle_signs`
-  numhl      = false, -- Toggle with `:Gitsigns toggle_numhl`
-  linehl     = false, -- Toggle with `:Gitsigns toggle_linehl`
-  word_diff  = false, -- Toggle with `:Gitsigns toggle_word_diff`
+  signcolumn = true,  -- Toggle with `:Hgsigns toggle_signs`
+  numhl      = false, -- Toggle with `:Hgsigns toggle_numhl`
+  linehl     = false, -- Toggle with `:Hgsigns toggle_linehl`
+  word_diff  = false, -- Toggle with `:Hgsigns toggle_word_diff`
   watch_gitdir = {
     follow_files = true
   },
   auto_attach = true,
   attach_to_untracked = false,
-  current_line_blame = false, -- Toggle with `:Gitsigns toggle_current_line_blame`
+  current_line_blame = false, -- Toggle with `:Hgsigns toggle_current_line_blame`
   current_line_blame_opts = {
     virt_text = true,
     virt_text_pos = 'eol', -- 'eol' | 'overlay' | 'right_align'

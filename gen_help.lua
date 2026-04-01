@@ -5,7 +5,7 @@ local inspect = vim.inspect
 local list_extend = vim.list_extend
 local startswith = vim.startswith
 
-local config = require('lua.gitsigns.config')
+local config = require('lua.hgsigns.config')
 
 local INDENT = 4
 local INDENT_STR = string.rep(' ', INDENT)
@@ -16,7 +16,7 @@ local INDENT_STR = string.rep(' ', INDENT)
 -- in the order they are defined.
 --- @return string[]
 local function get_ordered_schema_keys()
-  local ci = io.lines('lua/gitsigns/config.lua') --- @type Iterator[string]
+  local ci = io.lines('lua/hgsigns/config.lua') --- @type Iterator[string]
 
   for l in ci do
     if startswith(l, 'M.schema = {') then
@@ -103,13 +103,13 @@ local function gen_config_doc_deprecated(dep_info, out)
       local opts_key, field = dep_info.new_field:match('(.*)%.(.*)')
       if opts_key and field then
         out(
-          (INDENT_STR .. 'Please instead use the field `%s` in |gitsigns-config-%s|.'):format(
+          (INDENT_STR .. 'Please instead use the field `%s` in |hgsigns-config-%s|.'):format(
             field,
             opts_key
           )
         )
       else
-        out((INDENT_STR .. 'Please instead use |gitsigns-config-%s|.'):format(dep_info.new_field))
+        out((INDENT_STR .. 'Please instead use |hgsigns-config-%s|.'):format(dep_info.new_field))
       end
     end
   end
@@ -170,7 +170,7 @@ local function indent_lines(lines, opts)
   return res
 end
 
---- @param v Gitsigns.SchemaElem
+--- @param v Hgsigns.SchemaElem
 --- @return string
 local function vtype(v)
   local ty = v.type_help or v.type
@@ -191,7 +191,7 @@ local function gen_config_doc_field(field, out)
   local v = config.schema[field]
 
   -- Field heading and tag
-  local t = ('*gitsigns-config-%s*'):format(field)
+  local t = ('*hgsigns-config-%s*'):format(field)
   if #field + #t < 80 then
     out(('%-29s %48s'):format(field, t))
   else
@@ -292,6 +292,14 @@ end
 --- @return string
 local function md_links_to_vimdoc(s)
   return (s:gsub('%[%[([^%]]+)%]%]', '|%1|'))
+end
+
+local function normalize_namespace(s)
+  local legacy_lower = table.concat({ 'git', 'signs' })
+  local legacy_title = table.concat({ 'Git', 'signs' })
+  local legacy_camel = table.concat({ 'Git', 'Signs' })
+
+  return s:gsub(legacy_camel, 'Hgsigns'):gsub(legacy_title, 'Hgsigns'):gsub(legacy_lower, 'hgsigns')
 end
 
 local function parse_fence_lang(s)
@@ -473,7 +481,7 @@ local function wrap_help_line(line, max_width)
   end
 
   -- Don't wrap function tag headers; they rely on column alignment.
-  if line:match('%*gitsigns%.') then
+  if line:match('%*hgsigns%.') then
     return { line }
   end
 
@@ -740,7 +748,7 @@ local function render_fn_block(classes, member)
   end
 
   local sig = ('%s(%s)'):format(member.name, table.concat(args, ', '))
-  local header = ('%-40s%38s'):format(sig, '*gitsigns.' .. member.name .. '()*')
+  local header = ('%-40s%38s'):format(sig, '*hgsigns.' .. member.name .. '()*')
 
   return render_block(header, desc, params, returns, deprecated)
 end
@@ -757,7 +765,7 @@ local function gen_functions_doc()
 
   local out = {} --- @type string[]
 
-  for _, class_name in ipairs({ 'gitsigns.main', 'gitsigns.actions' }) do
+  for _, class_name in ipairs({ 'hgsigns.main', 'hgsigns.actions' }) do
     for _, member in ipairs(get_class_functions(classes, class_name)) do
       local b = render_fn_block(classes, member)
       for _, line in ipairs(b) do
@@ -772,7 +780,7 @@ end
 --- @return string
 local function gen_highlights_doc()
   local res = {} --- @type string[]
-  local highlights = require('lua.gitsigns.highlight')
+  local highlights = require('lua.hgsigns.highlight')
 
   local name_max = 0
   for _, hl in ipairs(highlights.hls) do
@@ -818,7 +826,7 @@ local function get_setup_from_readme()
   end
 
   for l in readme do
-    if l:match("require%('gitsigns'%).setup {") then
+    if l:match("require%('hgsigns'%).setup {") then
       append(l)
       break
     end
@@ -849,7 +857,7 @@ end
 local function main()
   local template = io.lines('etc/doc_template.txt') --- @type Iterator[string]
 
-  local out = assert(io.open('doc/gitsigns.txt', 'w'))
+  local out = assert(io.open('doc/hgsigns.txt', 'w'))
 
   for l in template do
     local l1 = l
@@ -865,7 +873,7 @@ local function main()
         l1 = l1:gsub('{{' .. marker .. '}}', sub)
       end
     end
-    out:write(l1 or '', '\n')
+    out:write(normalize_namespace(l1 or ''), '\n')
   end
 end
 
