@@ -39,7 +39,7 @@ local M = {}
 --- @field nr? integer Window number or ID when using location list. Defaults to `0`.
 --- @field open? boolean Open the quickfix/location list viewer. Defaults to `true`.
 
---- Variations of functions from M which are used for the Gitsigns command
+--- Variations of functions from M which are used for the Hgsigns command
 --- @type table<string,fun(args: Hgsigns.CmdArgs, params: Hgsigns.CmdParams)>
 local C = {}
 
@@ -80,12 +80,12 @@ local function complete_heads(arglead)
   )
 end
 
---- Detach Gitsigns from all buffers it is attached to.
+--- Detach Hgsigns from all buffers it is attached to.
 function M.detach_all()
   require('hgsigns.attach').detach_all()
 end
 
---- Detach Gitsigns from the buffer {bufnr}. If {bufnr} is not
+--- Detach Hgsigns from the buffer {bufnr}. If {bufnr} is not
 --- provided then the current buffer is used.
 ---
 --- @param bufnr integer Buffer number
@@ -93,7 +93,7 @@ function M.detach(bufnr)
   require('hgsigns.attach').detach(bufnr)
 end
 
---- Attach Gitsigns to the buffer.
+--- Attach Hgsigns to the buffer.
 ---
 --- Attributes:
 --- - {async}
@@ -108,11 +108,11 @@ function M.attach(bufnr, ctx, trigger, callback)
   async_run(callback, require('hgsigns.attach').attach, bufnr or current_buf(), ctx, trigger)
 end
 
---- Toggle [[gitsigns-config-signbooleancolumn]]
+--- Toggle [[hgsigns-config-signbooleancolumn]]
 ---
 --- @param value boolean|nil Value to set toggle. If `nil`
 ---     the toggle value is inverted.
---- @return boolean : Current value of [[gitsigns-config-signcolumn]]
+--- @return boolean : Current value of [[hgsigns-config-signcolumn]]
 function M.toggle_signs(value)
   if value ~= nil then
     config.signcolumn = value
@@ -122,12 +122,12 @@ function M.toggle_signs(value)
   return config.signcolumn
 end
 
---- Toggle [[gitsigns-config-numhl]]
+--- Toggle [[hgsigns-config-numhl]]
 ---
 --- @param value boolean|nil Value to set toggle. If `nil`
 ---     the toggle value is inverted.
 ---
---- @return boolean : Current value of [[gitsigns-config-numhl]]
+--- @return boolean : Current value of [[hgsigns-config-numhl]]
 function M.toggle_numhl(value)
   if value ~= nil then
     config.numhl = value
@@ -137,11 +137,11 @@ function M.toggle_numhl(value)
   return config.numhl
 end
 
---- Toggle [[gitsigns-config-linehl]]
+--- Toggle [[hgsigns-config-linehl]]
 ---
 --- @param value boolean|nil Value to set toggle. If `nil`
 ---     the toggle value is inverted.
---- @return boolean : Current value of [[gitsigns-config-linehl]]
+--- @return boolean : Current value of [[hgsigns-config-linehl]]
 M.toggle_linehl = function(value)
   if value ~= nil then
     config.linehl = value
@@ -151,11 +151,11 @@ M.toggle_linehl = function(value)
   return config.linehl
 end
 
---- Toggle [[gitsigns-config-word_diff]]
+--- Toggle [[hgsigns-config-word_diff]]
 ---
 --- @param value boolean|nil Value to set toggle. If `nil`
 ---     the toggle value is inverted.
---- @return boolean : Current value of [[gitsigns-config-word_diff]]
+--- @return boolean : Current value of [[hgsigns-config-word_diff]]
 function M.toggle_word_diff(value)
   if value ~= nil then
     config.word_diff = value
@@ -167,11 +167,11 @@ function M.toggle_word_diff(value)
   return config.word_diff
 end
 
---- Toggle [[gitsigns-config-current_line_blame]]
+--- Toggle [[hgsigns-config-current_line_blame]]
 ---
 --- @param value boolean|nil Value to set toggle. If `nil`
 ---     the toggle value is inverted.
---- @return boolean : Current value of [[gitsigns-config-current_line_blame]]
+--- @return boolean : Current value of [[hgsigns-config-current_line_blame]]
 function M.toggle_current_line_blame(value)
   if value ~= nil then
     config.current_line_blame = value
@@ -182,11 +182,11 @@ function M.toggle_current_line_blame(value)
 end
 
 --- @deprecated Use [[hgsigns.preview_hunk_inline()]]
---- Toggle [[gitsigns-config-show_deleted]]
+--- Toggle [[hgsigns-config-show_deleted]]
 ---
 --- @param value boolean|nil Value to set toggle. If `nil`
 ---     the toggle value is inverted.
---- @return boolean : Current value of [[gitsigns-config-show_deleted]]
+--- @return boolean : Current value of [[hgsigns-config-show_deleted]]
 function M.toggle_deleted(value)
   if value ~= nil then
     config.show_deleted = value
@@ -697,30 +697,30 @@ end
 --- ```lua
 ---   -- Change base to 1 commit behind head
 ---   require('hgsigns').change_base('HEAD~1')
----   -- :Gitsigns change_base HEAD~1
+---   -- :Hgsigns change_base HEAD~1
 ---
----   -- Also works using the Gitsigns command
----   :Gitsigns change_base HEAD~1
+---   -- Also works using the Hgsigns command
+---   :Hgsigns change_base HEAD~1
 ---
 ---   -- Other variations
 ---   require('hgsigns').change_base('~1')
----   -- :Gitsigns change_base ~1
+---   -- :Hgsigns change_base ~1
 ---   require('hgsigns').change_base('~')
----   -- :Gitsigns change_base ~
+---   -- :Hgsigns change_base ~
 ---   require('hgsigns').change_base('^')
----   -- :Gitsigns change_base ^
+---   -- :Hgsigns change_base ^
 ---
 ---   -- Commits work too
 ---   require('hgsigns').change_base('92eb3dd')
----   -- :Gitsigns change_base 92eb3dd
+---   -- :Hgsigns change_base 92eb3dd
 ---
 ---   -- Revert to original base
 ---   require('hgsigns').change_base()
----   -- :Gitsigns change_base
+---   -- :Hgsigns change_base
 --- ```
 ---
 --- For a more complete list of ways to specify bases, see
---- [[gitsigns-revision]].
+--- [[hgsigns-revision]].
 ---
 --- @param base string? The object/revision to diff against.
 --- @param global boolean? Change the base of all buffers.
@@ -775,15 +775,15 @@ end
 --- ```lua
 ---   -- Diff against the index
 ---   require('hgsigns').diffthis()
----   -- :Gitsigns diffthis
+---   -- :Hgsigns diffthis
 ---
 ---   -- Diff against the last commit
 ---   require('hgsigns').diffthis('~1')
----   -- :Gitsigns diffthis ~1
+---   -- :Hgsigns diffthis ~1
 --- ```
 ---
 --- For a more complete list of ways to specify bases, see
---- [[gitsigns-revision]].
+--- [[hgsigns-revision]].
 ---
 --- Attributes:
 --- - {async}
@@ -845,15 +845,15 @@ CP.diffthis = complete_heads
 --- ```lua
 ---   -- View the index version of the file
 ---   require('hgsigns').show()
----   -- :Gitsigns show
+---   -- :Hgsigns show
 ---
 ---   -- View revision of file in the last commit
 ---   require('hgsigns').show('~1')
----   -- :Gitsigns show ~1
+---   -- :Hgsigns show ~1
 --- ```
 ---
 --- For a more complete list of ways to specify bases, see
---- [[gitsigns-revision]].
+--- [[hgsigns-revision]].
 ---
 --- Attributes:
 --- - {async}

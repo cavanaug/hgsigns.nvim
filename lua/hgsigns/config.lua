@@ -201,7 +201,7 @@ M.config = setmetatable({ _config = {} }, {
 })
 
 local function warn(s, ...)
-  vim.notify_once(s:format(...), vim.log.levels.WARN, { title = 'gitsigns' })
+  vim.notify_once(s:format(...), vim.log.levels.WARN, { title = 'hgsigns' })
 end
 
 --- @param x Hgsigns.SignConfig
@@ -242,14 +242,14 @@ M.schema = {
         • `show_count` to enable showing count of hunk, e.g. number of deleted
           lines.
 
-      The highlights `GitSigns[kind][type]` is used for each kind of sign. E.g.
+      The highlights `Hgsigns[kind][type]` is used for each kind of sign. E.g.
       'add' signs uses the highlights:
-        • `GitSignsAdd`   (for normal text signs)
-        • `GitSignsAddNr` (for signs when `config.numhl == true`)
-        • `GitSignsAddLn `(for signs when `config.linehl == true`)
-        • `GitSignsAddCul `(for signs when `config.culhl == true`)
+        • `HgsignsAdd`   (for normal text signs)
+        • `HgsignsAddNr` (for signs when `config.numhl == true`)
+        • `HgsignsAddLn `(for signs when `config.linehl == true`)
+        • `HgsignsAddCul `(for signs when `config.culhl == true`)
 
-      See |gitsigns-highlight-groups|.
+      See |hgsigns-highlight-groups|.
     ]],
   },
 
@@ -273,7 +273,7 @@ M.schema = {
     description = [[
     Configuration for signs of staged hunks.
 
-    See |gitsigns-config-signs|.
+    See |hgsigns-config-signs|.
     ]],
   },
 
@@ -436,7 +436,7 @@ M.schema = {
     description = [[
       Show the old version of hunks inline in the buffer (via virtual lines).
 
-      Note: Virtual lines currently use the highlight `GitSignsDeleteVirtLn`.
+      Note: Virtual lines currently use the highlight `HgsignsDeleteVirtLn`.
     ]],
   },
 
@@ -493,7 +493,7 @@ M.schema = {
       split = 'aboveleft',
     },
     description = [[
-      Options for the `:Gitsigns diffthis` command.
+      Options for the `:Hgsigns diffthis` command.
     ]],
   },
 
@@ -502,7 +502,7 @@ M.schema = {
     default_help = 'index',
     description = [[
       The object/revision to diff against.
-      See |gitsigns-revision|.
+      See |hgsigns-revision|.
     ]],
   },
 
@@ -558,7 +558,7 @@ M.schema = {
       return table.concat(status_txt, ' ')
     end]],
     description = [[
-      Function used to format `b:gitsigns_status`.
+      Function used to format `b:hgsigns_status`.
     ]],
   },
 
@@ -580,7 +580,7 @@ M.schema = {
       col = 1,
     },
     description = [[
-      Option overrides for the Gitsigns preview window. Table is passed directly
+      Option overrides for the Hgsigns preview window. Table is passed directly
       to `nvim_open_win`.
     ]],
   },
@@ -616,7 +616,7 @@ M.schema = {
       Adds an unobtrusive and customisable blame annotation at the end of
       the current line.
 
-      The highlight group used for the text is `GitSignsCurrentLineBlame`.
+      The highlight group used for the text is `HgsignsCurrentLineBlame`.
     ]],
   },
 
@@ -661,7 +661,7 @@ M.schema = {
     default = ' <author>, <author_time:%R> - <summary> ',
     description = [[
       String or function used to format the virtual text of
-      |gitsigns-config-current_line_blame|.
+      |hgsigns-config-current_line_blame|.
 
       When a string, accepts the following format specifiers:
 
@@ -739,9 +739,9 @@ M.schema = {
     default = ' <author>',
     description = [[
       String or function used to format the virtual text of
-      |gitsigns-config-current_line_blame| for lines that aren't committed.
+      |hgsigns-config-current_line_blame| for lines that aren't committed.
 
-      See |gitsigns-config-current_line_blame_formatter| for more information.
+      See |hgsigns-config-current_line_blame_formatter| for more information.
     ]],
   },
 
@@ -763,7 +763,7 @@ M.schema = {
     default = false,
     description = [[
       Enable GitHub integration. This allows the following features:
-      • `:Gitsigns blame_line` will show PR numbers (with a hyperlink)
+      • `:Hgsigns blame_line` will show PR numbers (with a hyperlink)
     ]],
   },
 
@@ -798,17 +798,17 @@ M.schema = {
 
       Uses the highlights:
         • For word diff in previews:
-          • `GitSignsAddInline`
-          • `GitSignsChangeInline`
-          • `GitSignsDeleteInline`
+          • `HgsignsAddInline`
+          • `HgsignsChangeInline`
+          • `HgsignsDeleteInline`
         • For word diff in buffer:
-          • `GitSignsAddLnInline`
-          • `GitSignsChangeLnInline`
-          • `GitSignsDeleteLnInline`
+          • `HgsignsAddLnInline`
+          • `HgsignsChangeLnInline`
+          • `HgsignsDeleteLnInline`
         • For word diff in virtual lines (e.g. show_deleted):
-          • `GitSignsAddVirtLnInline`
-          • `GitSignsChangeVirtLnInline`
-          • `GitSignsDeleteVirtLnInline`
+          • `HgsignsAddVirtLnInline`
+          • `HgsignsChangeVirtLnInline`
+          • `HgsignsDeleteVirtLnInline`
     ]],
   },
 
@@ -909,7 +909,7 @@ function M.build(user_config)
   for k, v in pairs(user_config) do
     local s = M.schema[k]
     if not s then
-      warn("gitsigns: Ignoring invalid configuration field '%s'", k)
+      warn("hgsigns: Ignoring invalid configuration field '%s'", k)
     else
       local ty = s.type
       if type(ty) == 'string' or type(ty) == 'function' then
