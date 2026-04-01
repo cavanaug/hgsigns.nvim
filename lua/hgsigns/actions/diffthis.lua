@@ -80,7 +80,7 @@ local function bufwrite(bufnr, dbufnr, base)
 end
 
 --- @async
---- Create a gitsigns buffer for a certain revision of a file
+--- Create a hgsigns buffer for a certain revision of a file
 --- @param bufnr integer
 --- @param base string?
 --- @param relpath string?
@@ -112,7 +112,7 @@ local function create_revision_buf(bufnr, base, relpath)
     vim.bo[dbuf].buftype = 'acwrite'
 
     api.nvim_create_autocmd('BufReadCmd', {
-      group = 'gitsigns',
+      group = 'hgsigns',
       buffer = dbuf,
       callback = function()
         async.run(bufread, bufnr, dbuf, base, relpath):raise_on_error()
@@ -120,7 +120,7 @@ local function create_revision_buf(bufnr, base, relpath)
     })
 
     api.nvim_create_autocmd('BufWriteCmd', {
-      group = 'gitsigns',
+      group = 'hgsigns',
       buffer = dbuf,
       callback = function()
         async.run(bufwrite, bufnr, dbuf, base):raise_on_error()

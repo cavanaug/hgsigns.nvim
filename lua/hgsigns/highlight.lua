@@ -28,7 +28,7 @@ end
 ---@return Hgsigns.Hldef? spec
 local function gen_hl(staged, kind, ty)
   local cty = capitalise(ty)
-  local hl = ('GitSigns%s%s%s'):format(staged and 'Staged' or '', cty, kind)
+  local hl = ('Hgsigns%s%s%s'):format(staged and 'Staged' or '', cty, kind)
 
   if kind == 'Ln' and (ty == 'delete' or 'ty' == 'topdelete') then
     return
@@ -47,17 +47,17 @@ local function gen_hl(staged, kind, ty)
 
   local fallbacks --- @type string[]
   if staged then
-    fallbacks = { ('GitSigns%s%s'):format(cty, kind) }
+    fallbacks = { ('Hgsigns%s%s'):format(cty, kind) }
   elseif ty == 'changedelete' then
-    fallbacks = { 'GitSignsChange' .. kind }
+    fallbacks = { 'HgsignsChange' .. kind }
   elseif ty == 'topdelete' then
-    fallbacks = { 'GitSignsDelete' .. kind }
+    fallbacks = { 'HgsignsDelete' .. kind }
   elseif ty == 'untracked' then
-    fallbacks = { 'GitSignsAdd' .. kind }
+    fallbacks = { 'HgsignsAdd' .. kind }
   elseif kind == 'Nr' then
     fallbacks = {
       ('GitGutter%sLineNr'):format(cty),
-      ('GitSigns%s'):format(cty),
+      ('Hgsigns%s'):format(cty),
     }
   elseif kind == 'Ln' then
     fallbacks = {
@@ -66,7 +66,7 @@ local function gen_hl(staged, kind, ty)
       ('Diff%s'):format(cty),
     }
   elseif kind == 'Cul' then
-    fallbacks = { ('GitSigns%s'):format(cty) }
+    fallbacks = { ('Hgsigns%s'):format(cty) }
   else
     fallbacks = {
       ('GitGutter%s'):format(cty),
@@ -111,7 +111,7 @@ end
 
 vim.list_extend(M.hls, {
   {
-    GitSignsAddPreview = {
+    HgsignsAddPreview = {
       'GitGutterAddLine',
       'SignifyLineAdd',
       'DiffAdd',
@@ -120,7 +120,7 @@ vim.list_extend(M.hls, {
   },
 
   {
-    GitSignsDeletePreview = {
+    HgsignsDeletePreview = {
       'GitGutterDeleteLine',
       'SignifyLineDelete',
       'DiffDelete',
@@ -129,65 +129,65 @@ vim.list_extend(M.hls, {
   },
 
   {
-    GitSignsNoEOLPreview = {
+    HgsignsNoEOLPreview = {
       'DiffNoEOL',
       'Constant',
       desc = 'Used for "No newline at end of file".',
     },
   },
 
-  { GitSignsCurrentLineBlame = { 'NonText', desc = 'Used for current line blame.' } },
+  { HgsignsCurrentLineBlame = { 'NonText', desc = 'Used for current line blame.' } },
 
   {
-    GitSignsAddInline = {
+    HgsignsAddInline = {
       'TermCursor',
       desc = 'Used for added word diff regions in inline previews.',
     },
   },
 
   {
-    GitSignsDeleteInline = {
+    HgsignsDeleteInline = {
       'TermCursor',
       desc = 'Used for deleted word diff regions in inline previews.',
     },
   },
 
   {
-    GitSignsChangeInline = {
+    HgsignsChangeInline = {
       'TermCursor',
       desc = 'Used for changed word diff regions in inline previews.',
     },
   },
 
   {
-    GitSignsAddLnInline = {
-      'GitSignsAddInline',
+    HgsignsAddLnInline = {
+      'HgsignsAddInline',
       desc = 'Used for added word diff regions when `config.word_diff == true`.',
     },
   },
 
   {
-    GitSignsChangeLnInline = {
-      'GitSignsChangeInline',
+    HgsignsChangeLnInline = {
+      'HgsignsChangeInline',
       desc = 'Used for changed word diff regions when `config.word_diff == true`.',
     },
   },
 
   {
-    GitSignsDeleteLnInline = {
-      'GitSignsDeleteInline',
+    HgsignsDeleteLnInline = {
+      'HgsignsDeleteInline',
       desc = 'Used for deleted word diff regions when `config.word_diff == true`.',
     },
   },
 
   -- Currently unused
-  -- {GitSignsAddLnVirtLn = {'GitSignsAddLn'}},
-  -- {GitSignsChangeVirtLn = {'GitSignsChangeLn'}},
-  -- {GitSignsAddLnVirtLnInLine = {'GitSignsAddLnInline', }},
-  -- {GitSignsChangeVirtLnInLine = {'GitSignsChangeLnInline', }},
+  -- {HgsignsAddLnVirtLn = {'HgsignsAddLn'}},
+  -- {HgsignsChangeVirtLn = {'HgsignsChangeLn'}},
+  -- {HgsignsAddLnVirtLnInLine = {'HgsignsAddLnInline', }},
+  -- {HgsignsChangeVirtLnInLine = {'HgsignsChangeLnInline', }},
 
   {
-    GitSignsDeleteVirtLn = {
+    HgsignsDeleteVirtLn = {
       'GitGutterDeleteLine',
       'SignifyLineDelete',
       'DiffDelete',
@@ -196,15 +196,15 @@ vim.list_extend(M.hls, {
   },
 
   {
-    GitSignsDeleteVirtLnInLine = {
-      'GitSignsDeleteLnInline',
+    HgsignsDeleteVirtLnInLine = {
+      'HgsignsDeleteLnInline',
       desc = 'Used for word diff regions in lines shown by inline `preview_hunk_inline()` or `show_deleted()`.',
     },
   },
 
   {
-    GitSignsVirtLnum = {
-      'GitSignsDeleteVirtLn',
+    HgsignsVirtLnum = {
+      'HgsignsDeleteVirtLn',
       desc = 'Used for line numbers in inline hunks previews.',
     },
   },
@@ -293,7 +293,7 @@ local function derive(hl, hldef, is_bg_light)
   end
 end
 
---- Setup a GitSign* highlight by deriving it from other potentially present
+--- Setup a Hgsigns* highlight by deriving it from other potentially present
 --- highlights.
 function M.setup_highlights()
   local is_bg_light = vim.o.background == 'light'
@@ -312,7 +312,7 @@ end
 function M.setup()
   M.setup_highlights()
   api.nvim_create_autocmd('ColorScheme', {
-    group = 'gitsigns',
+    group = 'hgsigns',
     callback = M.setup_highlights,
   })
 end
@@ -352,7 +352,7 @@ do --- temperature highlight
     end
 
     local fgs = fg and 'fg' or 'bg'
-    local hl_name = ('GitSignsColorTemp.%s.%d'):format(fgs, color)
+    local hl_name = ('HgsignsColorTemp.%s.%d'):format(fgs, color)
     api.nvim_set_hl(0, hl_name, { [fgs] = color })
     temp_colors[color] = hl_name
     return hl_name

@@ -197,7 +197,7 @@ function M.on_lines(buf, first, last_orig, last_new)
   M.update_sync_debounced(buf)
 end
 
-local ns = api.nvim_create_namespace('gitsigns')
+local ns = api.nvim_create_namespace('hgsigns')
 
 --- @param bufnr integer
 --- @param row integer
@@ -251,9 +251,9 @@ local function apply_word_diff(bufnr, row)
       ecol = scol + 1
     end
 
-    local hl_group = rtype == 'add' and 'GitSignsAddLnInline'
-      or rtype == 'change' and 'GitSignsChangeLnInline'
-      or 'GitSignsDeleteLnInline'
+    local hl_group = rtype == 'add' and 'HgsignsAddLnInline'
+      or rtype == 'change' and 'HgsignsChangeLnInline'
+      or 'HgsignsDeleteLnInline'
 
     local opts = {
       ephemeral = true,
@@ -274,7 +274,7 @@ local function apply_word_diff(bufnr, row)
   end
 end
 
-local ns_rm = api.nvim_create_namespace('gitsigns_removed')
+local ns_rm = api.nvim_create_namespace('hgsigns_removed')
 
 local VIRT_LINE_LEN = 300
 
@@ -307,19 +307,19 @@ local function show_deleted(bufnr, nsd, hunk)
         if rline > 1 then
           break
         end
-        vline[#vline + 1] = { line:sub(last_ecol, scol - 1), 'GitSignsDeleteVirtLn' }
-        vline[#vline + 1] = { line:sub(scol, ecol - 1), 'GitSignsDeleteVirtLnInline' }
+        vline[#vline + 1] = { line:sub(last_ecol, scol - 1), 'HgsignsDeleteVirtLn' }
+        vline[#vline + 1] = { line:sub(scol, ecol - 1), 'HgsignsDeleteVirtLnInline' }
         last_ecol = ecol
       end
     end
 
     if #line > 0 then
-      vline[#vline + 1] = { line:sub(last_ecol, -1), 'GitSignsDeleteVirtLn' }
+      vline[#vline + 1] = { line:sub(last_ecol, -1), 'HgsignsDeleteVirtLn' }
     end
 
     -- Add extra padding so the entire line is highlighted
     local padding = string.rep(' ', VIRT_LINE_LEN - #line)
-    vline[#vline + 1] = { padding, 'GitSignsDeleteVirtLn' }
+    vline[#vline + 1] = { padding, 'HgsignsDeleteVirtLn' }
 
     virt_lines[i] = vline
   end
@@ -417,7 +417,7 @@ M.update = throttle_async({ hash = 1, schedule = true }, function(bufnr)
     if
       config.signs_staged_enable
       and not file_mode
-      and (rev_is_index or bufname:match('^fugitive://') or bufname:match('^gitsigns://'))
+      and (rev_is_index or bufname:match('^fugitive://') or bufname:match('^hgsigns://'))
     then
       if not bcache.compare_text_head or config._refresh_staged_on_update then
         -- When the revision is from the index, we compare against HEAD to
@@ -531,7 +531,7 @@ function M.setup()
   end)
 
   api.nvim_create_autocmd('OptionSet', {
-    group = 'gitsigns',
+    group = 'hgsigns',
     pattern = { 'fileformat', 'bomb', 'eol' },
     callback = function(args)
       local buf = args.buf
@@ -546,8 +546,8 @@ function M.setup()
 
   do -- deferred updates from file watcher
     api.nvim_create_autocmd('TabEnter', {
-      group = 'gitsigns',
-      desc = 'Gitsigns: deferred updates',
+      group = 'hgsigns',
+      desc = 'Hgsigns: deferred updates',
       callback = function()
         for _, win in ipairs(api.nvim_tabpage_list_wins(0)) do
           local bufnr = api.nvim_win_get_buf(win)
@@ -560,8 +560,8 @@ function M.setup()
     })
 
     api.nvim_create_autocmd('BufEnter', {
-      group = 'gitsigns',
-      desc = 'Gitsigns: deferred updates',
+      group = 'hgsigns',
+      desc = 'Hgsigns: deferred updates',
       callback = function(args)
         local bufnr = args.buf
         if cache[bufnr] and cache[bufnr].update_on_view then

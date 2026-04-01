@@ -123,7 +123,7 @@ end
 --- @param id string|true
 local function close_all_but(id)
   for _, winid in ipairs(api.nvim_list_wins()) do
-    if vim.w[winid].gitsigns_preview ~= nil and vim.w[winid].gitsigns_preview ~= id then
+    if vim.w[winid].hgsigns_preview ~= nil and vim.w[winid].hgsigns_preview ~= id then
       pcall(api.nvim_win_close, winid, true)
     end
   end
@@ -132,13 +132,13 @@ end
 --- @param id string
 function M.close(id)
   for _, winid in ipairs(api.nvim_list_wins()) do
-    if vim.w[winid].gitsigns_preview == id then
+    if vim.w[winid].hgsigns_preview == id then
       pcall(api.nvim_win_close, winid, true)
     end
   end
 end
 
-local ns = api.nvim_create_namespace('gitsigns_popup')
+local ns = api.nvim_create_namespace('hgsigns_popup')
 
 --- @param bufnr integer
 --- @param lines_spec Hgsigns.LineSpec[]
@@ -213,7 +213,7 @@ local function create_win(bufnr, opts, id)
 
   local winid = api.nvim_open_win(bufnr, false, opts1)
 
-  vim.w[winid].gitsigns_preview = id
+  vim.w[winid].hgsigns_preview = id
 
   if not opts.height then
     expand_height(winid, #lines, opts.border)
@@ -227,7 +227,7 @@ local function create_win(bufnr, opts, id)
 
   -- Close the popup when navigating to any window which is not the preview
   -- itself.
-  local group = 'gitsigns_popup'
+  local group = 'hgsigns_popup'
   local group_id = api.nvim_create_augroup(group, {})
   local old_cursor = api.nvim_win_get_cursor(0)
 
@@ -297,7 +297,7 @@ end
 --- @return integer? winid
 function M.is_open(id)
   for _, winid in ipairs(api.nvim_list_wins()) do
-    if vim.w[winid].gitsigns_preview == id then
+    if vim.w[winid].hgsigns_preview == id then
       return winid
     end
   end

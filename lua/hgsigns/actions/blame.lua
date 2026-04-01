@@ -9,8 +9,8 @@ local api = vim.api
 
 local hash_colors = {} --- @type table<integer,string>
 
-local ns = api.nvim_create_namespace('gitsigns_blame_win')
-local ns_hl = api.nvim_create_namespace('gitsigns_blame_win_hl')
+local ns = api.nvim_create_namespace('hgsigns_blame_win')
+local ns_hl = api.nvim_create_namespace('hgsigns_blame_win_hl')
 
 --- Convert a hex char to a rgb color component
 ---
@@ -52,7 +52,7 @@ local function get_hash_color(sha)
     return hash_colors[color]
   end
 
-  local hl_name = string.format('GitSignsBlameColor.%s%s%s', r, g, b)
+  local hl_name = string.format('HgsignsBlameColor.%s%s%s', r, g, b)
   api.nvim_set_hl(0, hl_name, { fg = color })
   hash_colors[color] = hl_name
 
@@ -401,7 +401,7 @@ function M.blame(opts)
 
   local blm_bufnr = api.nvim_create_buf(false, true)
   api.nvim_win_set_buf(blm_win, blm_bufnr)
-  api.nvim_buf_set_name(blm_bufnr, (bcache:get_rev_bufname():gsub('^gitsigns:', 'gitsigns-blame:')))
+  api.nvim_buf_set_name(blm_bufnr, (bcache:get_rev_bufname():gsub('^hgsigns:', 'hgsigns-blame:')))
 
   local commit_lines = render(blame, blm_win, win, bcache.git_obj.revision)
 
@@ -409,7 +409,7 @@ function M.blame(opts)
   blm_bo.buftype = 'nofile'
   blm_bo.bufhidden = 'wipe'
   blm_bo.modifiable = false
-  blm_bo.filetype = 'gitsigns-blame'
+  blm_bo.filetype = 'hgsigns-blame'
 
   local blm_wlo = vim.wo[blm_win][0]
   blm_wlo.foldcolumn = '0'
@@ -447,7 +447,7 @@ function M.blame(opts)
   vim.cmd.syncbind()
 
   vim.keymap.set('n', '<CR>', function()
-    vim.cmd.popup(']GitsignsBlame')
+    vim.cmd.popup(']HgsignsBlame')
   end, {
     desc = 'Open blame context menu',
     buffer = blm_bufnr,
@@ -488,7 +488,7 @@ function M.blame(opts)
     buffer = blm_bufnr,
   })
 
-  menu('GitsignsBlame', {
+  menu('HgsignsBlame', {
     { 'Reblame at commit', 'r' },
     { 'Reblame at commit parent', 'R' },
     { 'Diff (tab)', 'd' },
@@ -496,7 +496,7 @@ function M.blame(opts)
     { '            (tab)', 'S' },
   })
 
-  local group = api.nvim_create_augroup('GitsignsBlame', {})
+  local group = api.nvim_create_augroup('HgsignsBlame', {})
 
   api.nvim_create_autocmd({ 'BufHidden', 'QuitPre' }, {
     buffer = bufnr,

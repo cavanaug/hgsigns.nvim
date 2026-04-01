@@ -46,7 +46,7 @@ function M:hl(ty, kind)
     return self._hl_cache[ty][kind]
   end
 
-  local result = ('GitSigns%s%s%s'):format(self.staged and 'Staged' or '', capitalise(ty), km[kind])
+  local result = ('Hgsigns%s%s%s'):format(self.staged and 'Staged' or '', capitalise(ty), km[kind])
   self._hl_cache[ty][kind] = result
   return result
 end
@@ -165,7 +165,7 @@ function M.new(staged)
     self.config = staged and config.signs_staged or config.signs
   end)
   self.staged = staged == true
-  self.group = 'gitsigns_signs_' .. (staged and 'staged' or '')
+  self.group = 'hgsigns_signs_' .. (staged and 'staged' or '')
   self.ns = api.nvim_create_namespace(self.group)
   self.signs = {}
   return self

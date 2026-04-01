@@ -44,9 +44,9 @@ function CacheEntry:get_rev_bufname(rev, filename)
   rev = rev or self.git_obj.revision or ':0'
   local gitdir = self.git_obj.repo.gitdir
   if filename == false then
-    return ('gitsigns://%s//%s'):format(gitdir, rev)
+    return ('hgsigns://%s//%s'):format(gitdir, rev)
   end
-  return ('gitsigns://%s//%s:%s'):format(gitdir, rev, filename or self.git_obj.relpath)
+  return ('hgsigns://%s//%s:%s'):format(gitdir, rev, filename or self.git_obj.relpath)
 end
 
 --- Invalidate any state dependent on the buffer content.

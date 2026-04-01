@@ -163,7 +163,7 @@ local function get_context(lvl)
   local module = get_cur_module(info)
   local func = get_cur_func_name(info, lvl, module)
 
-  module = module:gsub('^gitsigns%.', '')
+  module = module:gsub('^hgsigns%.', '')
 
   func = func:gsub('(.*)%d+$', '%1')
 

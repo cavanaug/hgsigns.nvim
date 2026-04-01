@@ -24,7 +24,7 @@ local M = {}
 --- @return string? commit
 --- @return string? gitdir
 local function parse_git_path(name)
-  if not vim.startswith(name, 'fugitive://') and not vim.startswith(name, 'gitsigns://') then
+  if not vim.startswith(name, 'fugitive://') and not vim.startswith(name, 'hgsigns://') then
     return
   end
 
@@ -33,7 +33,7 @@ local function parse_git_path(name)
   local plugin = proto:sub(1, 1):upper() .. proto:sub(2, -2)
 
   local commit, rel_path --- @type string?, string?
-  if plugin == 'Gitsigns' then
+  if plugin == 'Hgsigns' then
     commit = tail:match('^(:?[^:]+):')
     rel_path = tail:match('^:?[^:]+:(.*)')
   else -- Fugitive
@@ -75,7 +75,7 @@ end
 --- @param _ 'detach'
 --- @param bufnr integer
 local function on_detach(_, bufnr)
-  api.nvim_clear_autocmds({ group = 'gitsigns', buffer = bufnr })
+  api.nvim_clear_autocmds({ group = 'hgsigns', buffer = bufnr })
   M.detach(bufnr, true)
 end
 
@@ -108,16 +108,16 @@ local setup = Util.once(function()
   require('hgsigns.current_line_blame').setup()
 
   api.nvim_create_autocmd('BufFilePre', {
-    group = 'gitsigns',
-    desc = 'Gitsigns: detach when changing buffer names',
+    group = 'hgsigns',
+    desc = 'Hgsigns: detach when changing buffer names',
     callback = function(args)
       M.detach(args.buf)
     end,
   })
 
   api.nvim_create_autocmd('VimLeavePre', {
-    desc = 'Gitsigns: detach from all buffers',
-    group = 'gitsigns',
+    desc = 'Hgsigns: detach from all buffers',
+    group = 'hgsigns',
     callback = M.detach_all,
   })
 end)
@@ -361,7 +361,7 @@ M.attach = throttle_async({ hash = 1 }, function(cbuf, ctx, aucmd)
 
   local is_untracked = git_obj.object_name == nil
 
-  -- Manual attaches (`:Gitsigns attach`) should still be allowed for
+  -- Manual attaches (`:Hgsigns attach`) should still be allowed for
   -- untracked buffers.
   if aucmd and not config.attach_to_untracked and is_untracked then
     dprint('File is untracked')
@@ -419,7 +419,7 @@ M.attach = throttle_async({ hash = 1 }, function(cbuf, ctx, aucmd)
   })
 
   api.nvim_create_autocmd('BufWrite', {
-    group = 'gitsigns',
+    group = 'hgsigns',
     buffer = cbuf,
     callback = function()
       manager.update_sync_debounced(cbuf)
@@ -436,14 +436,14 @@ M.attach = throttle_async({ hash = 1 }, function(cbuf, ctx, aucmd)
   end
 end)
 
---- Detach Gitsigns from all buffers it is attached to.
+--- Detach Hgsigns from all buffers it is attached to.
 function M.detach_all()
   for k, _ in pairs(cache) do
     M.detach(k)
   end
 end
 
---- Detach Gitsigns from the buffer {bufnr}. If {bufnr} is not
+--- Detach Hgsigns from the buffer {bufnr}. If {bufnr} is not
 --- provided then the current buffer is used.
 ---
 --- @param bufnr integer Buffer number

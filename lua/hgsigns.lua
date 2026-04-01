@@ -79,10 +79,10 @@ local function setup_cwd_watcher(cwd, towatch)
         local info = git.Repo.get_info(cwd) or {}
         local new_head = info.abbrev_head
         async().schedule()
-        if new_head ~= vim.g.gitsigns_head then
-          vim.g.gitsigns_head = new_head
+        if new_head ~= vim.g.hgsigns_head then
+          vim.g.hgsigns_head = new_head
           api.nvim_exec_autocmds('User', {
-            pattern = 'GitSignsUpdate',
+            pattern = 'HgsignsUpdate',
             modeline = false,
           })
         end
@@ -132,11 +132,11 @@ local function update_cwd_head()
   async().schedule()
 
   api.nvim_exec_autocmds('User', {
-    pattern = 'GitSignsUpdate',
+    pattern = 'HgsignsUpdate',
     modeline = false,
   })
 
-  vim.g.gitsigns_head = head
+  vim.g.hgsigns_head = head
 
   if not gitdir then
     return
@@ -148,7 +148,7 @@ local function update_cwd_head()
 end
 
 local function setup_cli()
-  api.nvim_create_user_command('Gitsigns', function(params)
+  api.nvim_create_user_command('Hgsigns', function(params)
     async().run(function()
       require('hgsigns.cli').run(params)
     end)
@@ -167,8 +167,8 @@ local function setup_attach()
 
   -- Need to attach in 'BufFilePost' since we always detach in 'BufFilePre'
   api.nvim_create_autocmd({ 'BufFilePost', 'BufRead', 'BufNewFile', 'BufWritePost' }, {
-    group = 'gitsigns',
-    desc = 'Gitsigns: attach',
+    group = 'hgsigns',
+    desc = 'Hgsigns: attach',
     callback = function(args)
       if not config().auto_attach then
         return
@@ -186,9 +186,9 @@ local function setup_attach()
   --- vimpgrep creates and deletes lots of buffers so attaching to each one will
   --- waste lots of resource and slow down vimgrep.
   api.nvim_create_autocmd({ 'QuickFixCmdPre', 'QuickFixCmdPost' }, {
-    group = 'gitsigns',
+    group = 'hgsigns',
     pattern = '*vimgrep*',
-    desc = 'Gitsigns: disable attach during vimgrep',
+    desc = 'Hgsigns: disable attach during vimgrep',
     callback = function(args)
       attach_autocmd_disabled = args.event == 'QuickFixCmdPre'
     end,
@@ -217,7 +217,7 @@ local function setup_cwd_head()
   -- Need to debounce in case some plugin changes the cwd too often
   -- (like vim-grepper)
   api.nvim_create_autocmd('DirChanged', {
-    group = 'gitsigns',
+    group = 'hgsigns',
     callback = function()
       update_cwd_head_debounced()
     end,
@@ -232,10 +232,10 @@ local init = true
 --- Setup and start Hgsigns.
 ---
 --- @param cfg table|nil Configuration for Hgsigns.
----     See |gitsigns-usage| for more details.
+---     See |hgsigns-usage| for more details.
 function M.setup(cfg)
   if vim.fn.executable('git') == 0 then
-    print('gitsigns: git not in path. Aborting setup')
+    print('hgsigns: git not in path. Aborting setup')
     return
   end
 
@@ -245,7 +245,7 @@ function M.setup(cfg)
 
   -- Only do this once
   if init then
-    api.nvim_create_augroup('gitsigns', {})
+    api.nvim_create_augroup('hgsigns', {})
     setup_cli()
     -- TODO(lewis6991): do this lazily
     require('hgsigns.highlight').setup()

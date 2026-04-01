@@ -13,7 +13,7 @@ local M = {}
 --- @param bufnr integer
 local function autocmd_update(bufnr)
   api.nvim_exec_autocmds('User', {
-    pattern = 'GitSignsUpdate',
+    pattern = 'HgsignsUpdate',
     modeline = false,
     data = { buffer = bufnr },
   })
@@ -25,7 +25,7 @@ function M.update(bufnr, status)
   if not api.nvim_buf_is_loaded(bufnr) then
     return
   end
-  local bstatus = vim.b[bufnr].gitsigns_status_dict
+  local bstatus = vim.b[bufnr].hgsigns_status_dict
   if bstatus then
     status = vim.tbl_extend('force', bstatus, status)
   end
@@ -34,12 +34,12 @@ function M.update(bufnr, status)
     return
   end
 
-  vim.b[bufnr].gitsigns_head = status.head or ''
-  vim.b[bufnr].gitsigns_status_dict = status
+  vim.b[bufnr].hgsigns_head = status.head or ''
+  vim.b[bufnr].hgsigns_status_dict = status
 
   local config = require('hgsigns.config').config
 
-  vim.b[bufnr].gitsigns_status = config.status_formatter(status)
+  vim.b[bufnr].hgsigns_status = config.status_formatter(status)
 
   autocmd_update(bufnr)
 end
@@ -51,13 +51,13 @@ function M.clear(bufnr)
 
   local b = vim.b[bufnr]
 
-  if b.gitsigns_head == nil and b.gitsigns_status_dict == nil and b.gitsigns_status == nil then
+  if b.hgsigns_head == nil and b.hgsigns_status_dict == nil and b.hgsigns_status == nil then
     return
   end
 
-  b.gitsigns_head = nil
-  b.gitsigns_status_dict = nil
-  b.gitsigns_status = nil
+  b.hgsigns_head = nil
+  b.hgsigns_status_dict = nil
+  b.hgsigns_status = nil
   autocmd_update(bufnr)
 end
 

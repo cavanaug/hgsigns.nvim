@@ -68,7 +68,7 @@ function M.run(params)
       -- Need to wrap vim.ui.select as Snacks version of vim.ui.select returns a
       -- module table with a close method which conflicts with the async lib
       vim.ui.select(...)
-    end, M.complete('', 'Gitsigns '), {}) --[[@as string]]
+    end, M.complete('', 'Hgsigns '), {}) --[[@as string]]
     if not func then
       return
     end

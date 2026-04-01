@@ -10,7 +10,7 @@ local error_once = require('hgsigns.message').error_once
 
 local api = vim.api
 
-local namespace = api.nvim_create_namespace('gitsigns_blame')
+local namespace = api.nvim_create_namespace('hgsigns_blame')
 
 local M = {}
 
@@ -20,7 +20,7 @@ local function reset(bufnr)
     return
   end
   api.nvim_buf_del_extmark(bufnr, namespace, 1)
-  vim.b[bufnr].gitsigns_blame_line_dict = nil
+  vim.b[bufnr].hgsigns_blame_line_dict = nil
 end
 
 --- @param fmt string
@@ -88,7 +88,7 @@ local function default_formatter(fmt)
     return {
       {
         expand_blame_format(fmt, username, blame_info),
-        'GitSignsCurrentLineBlame',
+        'HgsignsCurrentLineBlame',
       },
     }
   end
@@ -138,8 +138,8 @@ local function handle_blame_info(bcache, lnum, blame_info, opts)
   local virt_text = get_blame_virt_text(bcache, blame_info)
   local virt_text_str = flatten_virt_text(virt_text)
 
-  vim.b[bufnr].gitsigns_blame_line_dict = blame_info
-  vim.b[bufnr].gitsigns_blame_line = virt_text_str
+  vim.b[bufnr].hgsigns_blame_line_dict = blame_info
+  vim.b[bufnr].hgsigns_blame_line = virt_text_str
 
   if opts.virt_text then
     local virt_text_pos = opts.virt_text_pos
@@ -252,7 +252,7 @@ function M.setup()
   for k in pairs(cache) do
     reset(k)
   end
-  local group = api.nvim_create_augroup('gitsigns_blame', {})
+  local group = api.nvim_create_augroup('hgsigns_blame', {})
 
   if not config.current_line_blame then
     return

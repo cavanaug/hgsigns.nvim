@@ -113,7 +113,7 @@ end
 local function autocmd_changed(file)
   vim.schedule(function()
     vim.api.nvim_exec_autocmds('User', {
-      pattern = 'GitSignsChanged',
+      pattern = 'HgsignsChanged',
       modeline = false,
       data = { file = file },
     })
