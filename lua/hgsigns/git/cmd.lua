@@ -6,6 +6,7 @@ local asystem = async.wrap(3, require('hgsigns.system').system)
 
 --- @class Hgsigns.Git.JobSpec : vim.SystemOpts
 --- @field ignore_error? boolean
+--- @field vcs? 'git'|'hg'
 
 --- @async
 --- @param args string[]
@@ -18,32 +19,51 @@ local function git_command(args, spec)
     spec.cwd = util.cygpath(spec.cwd)
   end
 
-  local cmd = {
-    'git',
-    '--no-pager',
-    '--no-optional-locks',
-    '--literal-pathspecs',
-    '-c',
-    'gc.auto=0', -- Disable auto-packing which emits messages to stderr
-    '-c',
-    'core.quotepath=off',
-    '-c',
-    'color.ui=false',
-    '-c',
-    'color.diff=false',
-  }
+  local vcs = spec.vcs or 'git'
+
+  local cmd
+  if vcs == 'hg' then
+    cmd = {
+      'hg',
+      '--config',
+      'ui.relative-paths=false',
+    }
+  else
+    cmd = {
+      'git',
+      '--no-pager',
+      '--no-optional-locks',
+      '--literal-pathspecs',
+      '-c',
+      'gc.auto=0', -- Disable auto-packing which emits messages to stderr
+      '-c',
+      'core.quotepath=off',
+      '-c',
+      'color.ui=false',
+      '-c',
+      'color.diff=false',
+    }
+  end
   vim.list_extend(cmd, args)
 
   if spec.text == nil then
     spec.text = true
   end
 
-  -- Force English messages for git output parsing.
-  -- Git translations can cause our stderr pattern matching to fail.
-  spec.env = vim.tbl_extend('force', spec.env or {}, {
-    LC_ALL = 'C',
-    LANGUAGE = 'C',
-  })
+  if vcs == 'hg' then
+    spec.env = vim.tbl_extend('force', spec.env or {}, {
+      HGPLAIN = '1',
+      LC_ALL = 'C',
+      LANGUAGE = 'C',
+    })
+  else
+    -- Force English messages for git output parsing.
+    -- Git translations can cause our stderr pattern matching to fail.
+    spec.env = vim.tbl_extend('force', spec.env or {}, {
+      LC_ALL = 'C',
+      LANGUAGE = 'C',
+    })
+  end
 
   --- @type vim.SystemCompleted
   local obj = asystem(cmd, spec)

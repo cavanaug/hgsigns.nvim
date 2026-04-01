@@ -5,6 +5,7 @@ return {
     --   'fatal: not a git repository (or any of the parent directories)'
     --   'fatal: not a git repository (or any parent up to mount point /)'
     not_in_git = 'fatal: not a git repository',
+    not_in_hg = 'abort: no repository found',
     path_does_not_exist = "fatal: path .* does not exist in '.*'",
     path_exist_on_disk_but_not_in = "fatal: path .* exists on disk, but not in '.*'",
     path_is_outside_worktree = "fatal: .*: '.*' is outside repository at '.*'",

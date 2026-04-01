@@ -15,6 +15,7 @@ end
 --- @field private notify_callbacks_debounced fun(weak_self:{ref:Hgsigns.Repo.Watcher})
 --- @field private gitdir string
 --- @field private commondir string
+--- @field private vcs 'git'|'hg'
 --- @field private handles table<string, uv.uv_fs_event_t> Map from watched dir -> handle
 --- @field private head_ref_dir? string
 --- @field private _gc userdata? Used for garbage collection
@@ -23,13 +24,15 @@ Watcher.__index = Watcher
 
 --- @param gitdir string
 --- @param commondir? string
+--- @param vcs? 'git'|'hg'
 --- @return Hgsigns.Repo.Watcher
-function Watcher.new(gitdir, commondir)
+function Watcher.new(gitdir, commondir, vcs)
   local self = setmetatable({}, Watcher)
 
   self.update_callbacks = {}
   self.gitdir = gitdir
   self.commondir = commondir or gitdir
+  self.vcs = vcs or 'git'
   self.handles = {}
   self.notify_callbacks_debounced = debounce_trailing(200, Watcher.notify_callbacks)
 
@@ -47,12 +50,14 @@ function Watcher.new(gitdir, commondir)
   -- only watching the gitdir root, so we add extra watches as needed.
   self:_watch_dir(gitdir, weak_self)
 
-  if self.commondir ~= gitdir then
-    self:_watch_dir(self.commondir, weak_self)
-  end
+  if self.vcs == 'git' then
+    if self.commondir ~= gitdir then
+      self:_watch_dir(self.commondir, weak_self)
+    end
 
-  local reftable_dir = Path.join(self.commondir, 'reftable')
-  self:_watch_dir(reftable_dir, weak_self)
+    local reftable_dir = Path.join(self.commondir, 'reftable')
+    self:_watch_dir(reftable_dir, weak_self)
+  end
 
   return self
 end
@@ -90,6 +95,10 @@ end
 --- don't necessarily touch `gitdir/HEAD`.
 --- @param head_ref? string
 function Watcher:set_head_ref(head_ref)
+  if self.vcs ~= 'git' then
+    return
+  end
+
   local old_dir = self.head_ref_dir
   local new_dir --- @type string?
 
@@ -166,18 +175,24 @@ function Watcher.handler(weak_self)
 
     -- The luv docs say filename is passed as a string but it has been observed
     -- to sometimes be nil.
-    --    https://github.com/lewis6991/hgsigns.nvim/issues/848
+    --    https://github.com/neovim/neovim/issues/848
     if not filename then
       log.eprint('No filename')
     else
-      for _, ex in ipairs({
+      local ignored = {
         '.watchman-cookie',
         'index.lock',
-      }) do
+      }
+
+      for _, ex in ipairs(ignored) do
         if vim.startswith(filename, ex) then
           log.dprintf("Git dir update: '%s' %s (ignoring)", filename, inspect(events))
           return
         end
+      end
+
+      if self.vcs == 'hg' and filename ~= 'dirstate' and filename ~= 'branch' then
+        return
       end
 
       log.dprintf("Git dir update: '%s' %s", filename, inspect(events))

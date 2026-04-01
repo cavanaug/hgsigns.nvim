@@ -2,6 +2,7 @@ local helpers = require('test.gs_helpers')
 
 local eq = helpers.eq
 local expectf = helpers.expectf
+local debug_messages = helpers.debug_messages
 
 helpers.env()
 
@@ -15,8 +16,8 @@ describe('git locale', function()
     helpers.cleanup()
   end)
 
-  it('attaches in fresh repos regardless of locale', function()
-    helpers.setup_test_repo({ no_add = true })
+  it('attaches in fresh hg repos with normalized mercurial commands', function()
+    helpers.setup_test_hg_repo({ no_add = true })
 
     helpers.exec_lua(function()
       package.loaded['hgsigns.git.cmd'] = nil
@@ -32,10 +33,14 @@ describe('git locale', function()
         _G.hgsigns_git_envs[#_G.hgsigns_git_envs + 1] = {
           args = vim.deepcopy(args),
           env = vim.deepcopy(spec.env or {}),
+          vcs = spec.vcs or 'git',
         }
 
         return stdout, stderr, code
       end
+
+      package.loaded['hgsigns.git.repo'] = nil
+      package.loaded['hgsigns.git'] = nil
 
       vim.env.LANG = 'zh_CN.UTF-8'
       vim.env.LC_ALL = 'zh_CN.UTF-8'
@@ -50,7 +55,7 @@ describe('git locale', function()
     helpers.edit(helpers.test_file)
 
     helpers.check({
-      status = { head = '', added = 18, changed = 0, removed = 0 },
+      status = { head = 'default', added = 18, changed = 0, removed = 0 },
     })
 
     expectf(function()
@@ -63,9 +68,23 @@ describe('git locale', function()
       return _G.hgsigns_git_envs
     end)
 
+    local saw_hg = false
     for _, item in ipairs(envs) do
-      eq('C', item.env.LC_ALL)
-      eq('C', item.env.LANGUAGE)
+      if item.vcs == 'hg' then
+        saw_hg = true
+        eq('1', item.env.HGPLAIN)
+        eq('C', item.env.LC_ALL)
+        eq('C', item.env.LANGUAGE)
+      end
     end
+    eq(true, saw_hg)
+
+    local saw_hg_config = false
+    for _, line in ipairs(debug_messages()) do
+      if line:find('system.system: hg %-%-config ui%.relative%-paths=false ', 1) then
+        saw_hg_config = true
+      end
+    end
+    eq(true, saw_hg_config)
   end)
 end)

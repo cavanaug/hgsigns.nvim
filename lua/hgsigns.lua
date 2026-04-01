@@ -6,6 +6,27 @@ local M = {}
 
 local cwd_watcher ---@type uv.uv_fs_event_t?
 
+--- @param gitdir string
+--- @return boolean
+local function is_hg_gitdir(gitdir)
+  return gitdir:match('[\\/]%.hg$') ~= nil
+end
+
+--- @param gitdir string
+--- @param filename string?
+--- @return boolean
+local function is_relevant_repo_event(gitdir, filename)
+  if not filename then
+    return true
+  end
+
+  if is_hg_gitdir(gitdir) then
+    return filename == 'dirstate' or filename == 'branch'
+  end
+
+  return filename == 'HEAD'
+end
+
 local function log()
   return require('hgsigns.debug.log')
 end
@@ -52,8 +73,8 @@ end
 ---Uses module local variable cwd_watcher
 ---@async
 ---@param cwd string current working directory
----@param towatch string Directory to watch
-local function setup_cwd_watcher(cwd, towatch)
+---@param gitdir string Directory to watch
+local function setup_cwd_watcher(cwd, gitdir)
   if cwd_watcher then
     cwd_watcher:stop()
     -- TODO(lewis6991): (#1027) Running `fs_event:stop()` -> `fs_event:start()`
@@ -65,7 +86,7 @@ local function setup_cwd_watcher(cwd, towatch)
     cwd_watcher = assert(uv.new_fs_event())
   end
 
-  if cwd_watcher:getpath() == towatch then
+  if cwd_watcher:getpath() == gitdir then
     -- Already watching
     return
   end
@@ -90,22 +111,18 @@ local function setup_cwd_watcher(cwd, towatch)
       :raise_on_error()
   end)
 
-  -- Watch .git/HEAD to detect branch changes
-  cwd_watcher:start(towatch, {}, function()
-    async().run(function(err)
+  cwd_watcher:start(gitdir, {}, function(err, filename)
+    async().run(function()
       local __FUNC__ = 'cwd_watcher_cb'
       if err then
         log().dprintf('Git dir update error: %s', err)
         return
       end
+      if not is_relevant_repo_event(gitdir, filename) then
+        return
+      end
       log().dprint('Git cwd dir update')
-
       update_head()
-
-      -- git often (always?) replaces .git/HEAD which can change the inode being
-      -- watched so we need to stop the current watcher and start another one to
-      -- make sure we keep getting future events
-      setup_cwd_watcher(cwd, towatch)
     end)
   end)
 end
@@ -118,17 +135,10 @@ local function update_cwd_head()
     return
   end
 
-  local paths = vim.fs.find('.git', {
-    limit = 1,
-    upward = true,
-    type = 'directory',
-  })
-
-  if #paths == 0 then
-    return
-  end
-
-  local gitdir, head = get_gitdir_and_head()
+  local git = require('hgsigns.git')
+  local info = git.Repo.get_info(cwd)
+  local gitdir = info and info.gitdir
+  local head = info and info.abbrev_head
   async().schedule()
 
   api.nvim_exec_autocmds('User', {
@@ -142,9 +152,7 @@ local function update_cwd_head()
     return
   end
 
-  local towatch = gitdir .. '/HEAD'
-
-  setup_cwd_watcher(cwd, towatch)
+  setup_cwd_watcher(cwd, gitdir)
 end
 
 local function setup_cli()
@@ -234,8 +242,8 @@ local init = true
 --- @param cfg table|nil Configuration for Hgsigns.
 ---     See |hgsigns-usage| for more details.
 function M.setup(cfg)
-  if vim.fn.executable('git') == 0 then
-    print('hgsigns: git not in path. Aborting setup')
+  if vim.fn.executable('hg') == 0 and vim.fn.executable('git') == 0 then
+    print('hgsigns: neither hg nor git in path. Aborting setup')
     return
   end
 

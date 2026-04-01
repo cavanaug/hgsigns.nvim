@@ -94,6 +94,9 @@ function Obj:get_show_text(revision, relpath)
   if revision then
     --- @cast relpath -?
     stdout, stderr = self.repo:get_show_text_at_revision(revision, relpath, self.encoding)
+  elseif self.repo.vcs == 'hg' then
+    --- @cast relpath -?
+    stdout, stderr = self.repo:get_show_text_at_revision(assert(self.object_name), relpath, self.encoding)
   else
     stdout, stderr = self.repo:get_show_text(assert(self.object_name), self.encoding)
   end
@@ -226,7 +229,12 @@ function Obj.new(file, revision, encoding, gitdir, toplevel)
   local repo, err = Repo.get(cwd, gitdir, toplevel)
   if not repo then
     log.dprint('Not in git repo')
-    if err and not err:match(errors.e.not_in_git) and not err:match(errors.e.worktree) then
+    if
+      err
+      and not err:match(errors.e.not_in_git)
+      and not err:match(errors.e.not_in_hg)
+      and not err:match(errors.e.worktree)
+    then
       log.eprint(err)
     end
     return

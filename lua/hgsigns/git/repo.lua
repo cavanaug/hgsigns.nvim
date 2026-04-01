@@ -11,11 +11,15 @@ local check_version = require('hgsigns.git.version').check
 
 local uv = vim.uv or vim.loop ---@diagnostic disable-line: deprecated
 
+local normalize_path --- @type fun(path?: string): string?
+
 --- @class Hgsigns.RepoInfo
 --- @field gitdir string
 --- @field toplevel string
 --- @field detached boolean
 --- @field abbrev_head string
+--- @field vcs 'git'|'hg'
+--- @field head_oid? string
 
 --- @class Hgsigns.Repo : Hgsigns.RepoInfo
 ---
@@ -28,6 +32,49 @@ local uv = vim.uv or vim.loop ---@diagnostic disable-line: deprecated
 --- @field head_ref? string
 --- @field commondir string
 local M = {}
+
+--- @param gitdir string?
+--- @return boolean
+local function is_hg_gitdir(gitdir)
+  return gitdir ~= nil and gitdir:match('[\\/]%.hg$') ~= nil
+end
+
+--- @param stderr string?
+--- @return boolean
+local function is_not_in_hg_repo(stderr)
+  return stderr ~= nil and stderr:match(errors.e.not_in_hg) ~= nil
+end
+
+--- @param file string
+--- @return string
+local function default_mode_bits(file)
+  local stat = uv.fs_stat(file)
+  if stat and stat.mode and bit.band(stat.mode, 0x49) ~= 0 then
+    return '100755'
+  end
+  return '100644'
+end
+
+--- @param toplevel string
+--- @param file string
+--- @return string?
+local function to_relpath(toplevel, file)
+  local normalized_file = normalize_path(file)
+  local normalized_root = normalize_path(toplevel)
+  if not normalized_file or not normalized_root then
+    return
+  end
+
+  if vim.startswith(normalized_file, normalized_root .. '/') then
+    return normalized_file:sub(#normalized_root + 2)
+  end
+
+  if normalized_file == normalized_root then
+    return vim.fs.basename(normalized_file)
+  end
+
+  return normalized_file
+end
 
 --- @param gitdir string
 --- @return boolean
@@ -263,7 +310,10 @@ local function get_head_oid(gitdir, commondir)
   log.dprintf('Falling back to `git rev-parse HEAD`: %s', err)
 
   local stdout, stderr, code = async
-    .run(git_command, { '--git-dir', gitdir, 'rev-parse', 'HEAD' }, { ignore_error = true })
+    .run(git_command, { '--git-dir', gitdir, 'rev-parse', 'HEAD' }, {
+      ignore_error = true,
+      vcs = 'git',
+    })
     :wait()
 
   local oid = stdout[1]
@@ -309,6 +359,11 @@ function M:command(args, spec)
   spec = spec or {}
   spec.cwd = self.toplevel
 
+  if self.vcs == 'hg' then
+    spec.vcs = 'hg'
+    return git_command(args, spec)
+  end
+
   local args0 = { '--git-dir', self.gitdir }
 
   if self.detached then
@@ -319,6 +374,7 @@ function M:command(args, spec)
 
   vim.list_extend(args0, args)
 
+  spec.vcs = 'git'
   return git_command(args0, spec)
 end
 
@@ -378,6 +434,10 @@ function M:check_attr(attr, files)
     ret[f] = 'unspecified'
   end
 
+  if self.vcs == 'hg' then
+    return ret
+  end
+
   local output = self:command({ 'check-attr', attr, '--stdin' }, { stdin = files })
   local sep = ': ' .. attr .. ': '
 
@@ -409,7 +469,12 @@ end
 --- @param encoding? string
 --- @return string[] stdout, string? stderr
 function M:get_show_text(object, encoding)
-  local stdout, stderr = self:command({ 'show', object }, { text = false, ignore_error = true })
+  local stdout, stderr
+  if self.vcs == 'hg' then
+    stdout, stderr = self:command({ 'cat', '-r', object }, { text = false, ignore_error = true })
+  else
+    stdout, stderr = self:command({ 'show', object }, { text = false, ignore_error = true })
+  end
 
   if encoding and encoding ~= 'utf-8' and iconv_supported(encoding) then
     for i, l in ipairs(stdout) do
@@ -428,6 +493,21 @@ end
 --- @param encoding? string
 --- @return string[] stdout, string? stderr
 function M:get_show_text_at_revision(revision, relpath, encoding)
+  if self.vcs == 'hg' then
+    local stdout, stderr = self:command({ 'cat', '-r', revision, relpath }, {
+      text = false,
+      ignore_error = true,
+    })
+
+    if encoding and encoding ~= 'utf-8' and iconv_supported(encoding) then
+      for i, l in ipairs(stdout) do
+        stdout[i] = vim.iconv(l, encoding, 'utf-8')
+      end
+    end
+
+    return stdout, stderr
+  end
+
   local stdout, stderr = self:get_show_text(revision .. ':' .. relpath, encoding)
 
   if
@@ -460,6 +540,31 @@ function M._new(info)
   --- @type Hgsigns.Repo
   local self = setmetatable(info, { __index = M })
   self._lock = async.semaphore(1)
+  self.head_oid = info.head_oid
+
+  if self.vcs == 'hg' then
+    self.username = self:command({ 'config', 'ui.username' }, { ignore_error = true })[1]
+    self.commondir = self.gitdir
+
+    if config.watch_gitdir.enable then
+      self._watcher = Watcher.new(self.gitdir, self.commondir, self.vcs)
+      self._watcher:on_update(function()
+        local info2 = M.get_info(self.toplevel, self.gitdir, self.toplevel)
+        if not info2 then
+          return
+        end
+
+        self.head_oid = info2.head_oid
+        if self.abbrev_head ~= info2.abbrev_head then
+          self.abbrev_head = info2.abbrev_head
+          log.dprintf('HEAD changed, updating abbrev_head to %s', self.abbrev_head)
+        end
+      end)
+    end
+
+    return self
+  end
+
   self.username = self:command({ 'config', 'user.name' }, { ignore_error = true })[1]
 
   self.commondir = get_commondir(self.gitdir)
@@ -468,7 +573,7 @@ function M._new(info)
     local head = read_head(self.gitdir)
     self.head_ref = parse_head_ref(head)
     self.head_oid = get_head_oid(self.gitdir, self.commondir)
-    self._watcher = Watcher.new(self.gitdir, self.commondir)
+    self._watcher = Watcher.new(self.gitdir, self.commondir, self.vcs)
     self._watcher:set_head_ref(self.head_ref)
     self._watcher:on_update(function()
       -- Recompute on every debounced tick. The checked-out branch can move
@@ -523,11 +628,13 @@ function M.get(cwd, gitdir, toplevel)
 
     local repo = repo_cache[info.gitdir]
     if repo then
-      -- Keep cached repo metadata in sync with git's current state.
-      -- Without this, branch/rebase transitions can leave abbrev_head stale
-      -- until a watcher callback runs.
+      -- Keep cached repo metadata in sync with the repo's current state.
+      -- Without this, branch transitions can leave abbrev_head stale until a
+      -- watcher callback runs.
       repo.abbrev_head = info.abbrev_head
       repo.detached = info.detached
+      repo.head_oid = info.head_oid
+      repo.vcs = info.vcs
     else
       repo = M._new(info)
       repo_cache[info.gitdir] = repo
@@ -544,7 +651,7 @@ local has_win_cygpath = vim.fn.has('win32') == 1 and vim.fn.executable('cygpath'
 --- @async
 --- @param path? string
 --- @return string?
-local function normalize_path(path)
+normalize_path = function(path)
   if not path then
     return
   end
@@ -567,6 +674,7 @@ local function process_abbrev_head(gitdir, head_str, cwd)
   local short_sha = git_command({ 'rev-parse', '--short', 'HEAD' }, {
     ignore_error = true,
     cwd = cwd,
+    vcs = 'git',
   })[1] or ''
 
   -- Make tests easier
@@ -586,32 +694,78 @@ end
 --- @param gitdir? string
 --- @param worktree? string
 --- @return Hgsigns.RepoInfo? info, string? err
-function M.get_info(dir, gitdir, worktree)
+local function get_info_hg(dir, gitdir, worktree)
+  if gitdir and not is_hg_gitdir(gitdir) then
+    return nil, errors.e.not_in_hg
+  end
+
+  local cwd = worktree or (gitdir and vim.fs.dirname(gitdir)) or dir
+  local root_out, root_err, root_code = git_command({ 'root' }, {
+    ignore_error = true,
+    cwd = cwd,
+    vcs = 'hg',
+  })
+
+  if root_code > 0 then
+    if is_not_in_hg_repo(root_err) then
+      return nil, root_err
+    end
+    return nil, string.format('got stderr: %s', root_err or '')
+  end
+
+  local toplevel_r = normalize_path(root_out[1])
+  if not toplevel_r then
+    return nil, string.format('incomplete stdout: %s', table.concat(root_out, '\n'))
+  end
+
+  dir = normalize_path(dir)
+  if dir and not vim.startswith(dir, toplevel_r) then
+    log.dprintf("'%s' is outside worktree '%s'", dir, toplevel_r)
+    return
+  end
+
+  local branch_out, branch_err, branch_code = git_command({ 'branch' }, {
+    ignore_error = true,
+    cwd = toplevel_r,
+    vcs = 'hg',
+  })
+  if branch_code > 0 then
+    return nil, string.format('got stderr: %s', branch_err or '')
+  end
+
+  local parents_out, parents_err, parents_code = git_command({ 'parents', '--template', '{node}\n' }, {
+    ignore_error = true,
+    cwd = toplevel_r,
+    vcs = 'hg',
+  })
+  if parents_code > 0 then
+    return nil, string.format('got stderr: %s', parents_err or '')
+  end
+
+  return {
+    toplevel = toplevel_r,
+    gitdir = assert(normalize_path(Path.join(toplevel_r, '.hg'))),
+    abbrev_head = branch_out[1] or '',
+    detached = false,
+    vcs = 'hg',
+    head_oid = parents_out[1],
+  }
+end
+
+--- @async
+--- @param dir? string
+--- @param gitdir? string
+--- @param worktree? string
+--- @return Hgsigns.RepoInfo? info, string? err
+local function get_info_git(dir, gitdir, worktree)
   -- Does git rev-parse have --absolute-git-dir, added in 2.13:
   --    https://public-inbox.org/git/20170203024829.8071-16-szeder.dev@gmail.com/
   local has_abs_gd = check_version(2, 13)
-
-  -- Wait for internal scheduler to settle before running command (#215)
-  async.schedule()
-
-  if dir and not uv.fs_stat(dir) then
-    -- Cwd can be deleted externally, so check if it exists (see #1331)
-    log.dprintf("dir '%s' does not exist", dir)
-    return
-  end
 
   -- Explicitly fallback to env vars for better debug
   gitdir = gitdir or vim.env.GIT_DIR
   worktree = worktree or vim.env.GIT_WORK_TREE or vim.fs.dirname(gitdir)
 
-  -- gitdir and worktree must be provided together from `man git`:
-  -- > Specifying the location of the ".git" directory using this option (or GIT_DIR environment
-  -- > variable) turns off the repository discovery that tries to find a directory with ".git"
-  -- > subdirectory (which is how the repository and the top-level of the working tree are
-  -- > discovered), and tells Git that you are at the top level of the working tree. If you are
-  -- > not at the top-level directory of the working tree, you should tell Git where the
-  -- > top-level of the working tree is, with the --work-tree=<path> option (or GIT_WORK_TREE
-  -- > environment variable)
   local stdout, stderr, code = git_command(
     util.flatten({
       gitdir and { '--git-dir', gitdir },
@@ -626,6 +780,7 @@ function M.get_info(dir, gitdir, worktree)
       ignore_error = true,
       -- Worktree may be a relative path, so don't set cwd when it is provided.
       cwd = not worktree and dir or nil,
+      vcs = 'git',
     }
   )
 
@@ -669,7 +824,53 @@ function M.get_info(dir, gitdir, worktree)
     gitdir = gitdir_r,
     abbrev_head = process_abbrev_head(gitdir_r, stdout[3], toplevel_r),
     detached = gitdir_r ~= assert(normalize_path(Path.join(toplevel_r, '.git'))),
+    vcs = 'git',
   }
+end
+
+--- @async
+--- @param dir? string
+--- @param gitdir? string
+--- @param worktree? string
+--- @return Hgsigns.RepoInfo? info, string? err
+function M.get_info(dir, gitdir, worktree)
+  -- Wait for internal scheduler to settle before running command (#215)
+  async.schedule()
+
+  if dir and not uv.fs_stat(dir) then
+    -- Cwd can be deleted externally, so check if it exists (see #1331)
+    log.dprintf("dir '%s' does not exist", dir)
+    return
+  end
+
+  local explicit_hg = is_hg_gitdir(gitdir)
+  if explicit_hg then
+    return get_info_hg(dir, gitdir, worktree)
+  end
+
+  local hg_info, hg_err = get_info_hg(dir, gitdir, worktree)
+  local git_info, git_err = get_info_git(dir, gitdir, worktree)
+
+  if hg_info and git_info then
+    if #hg_info.toplevel > #git_info.toplevel then
+      return hg_info
+    end
+    return git_info
+  end
+
+  if hg_info then
+    return hg_info
+  end
+
+  if git_info then
+    return git_info
+  end
+
+  if hg_err and not is_not_in_hg_repo(hg_err) then
+    return nil, hg_err
+  end
+
+  return nil, git_err or hg_err
 end
 
 --- @class (exact) Hgsigns.Repo.LsTree.Result
@@ -721,7 +922,39 @@ function M:ls_tree(path, revision)
   }
 end
 
---- @class (exact) Hgsigns.Repo.LsFiles.Result
+--- @param relpath string
+--- @return Hgsigns.Repo.LsFiles.Result? info
+--- @return string? err
+function M:hg_file_info(relpath)
+  local results, stderr, code = self:command({ 'status', '-A', relpath }, { ignore_error = true })
+
+  if code > 0 and stderr then
+    local missing = stderr:match('^.-: No such file or directory$')
+    if missing then
+      return {}, nil
+    end
+    return nil, stderr
+  end
+
+  local result = { relpath = relpath, mode_bits = default_mode_bits(Path.join(self.toplevel, relpath)) }
+  local line = results[1]
+
+  if not line or line == '' then
+    return result
+  end
+
+  local status = line:sub(1, 1)
+  if status == '?' then
+    result.object_name = nil
+  elseif status == 'I' then
+    result.relpath = nil
+  else
+    result.object_name = self.head_oid
+  end
+
+  return result
+end
+
 --- @field relpath? string nil if file is not in working tree
 --- @field mode_bits? string
 --- @field object_name? string nil if file is untracked
@@ -735,6 +968,14 @@ end
 --- @return Hgsigns.Repo.LsFiles.Result? info
 --- @return string? err
 function M:ls_files(file)
+  if self.vcs == 'hg' then
+    local relpath = to_relpath(self.toplevel, file)
+    if not relpath then
+      return {}
+    end
+    return self:hg_file_info(relpath)
+  end
+
   local has_eol = check_version(2, 9)
 
   -- --others + --exclude-standard means ignored files won't return info, but
@@ -801,6 +1042,30 @@ end
 --- @return Hgsigns.Repo.LsFiles.Result? info
 --- @return string? err
 function M:file_info(file, revision)
+  if self.vcs == 'hg' then
+    local relpath = to_relpath(self.toplevel, file)
+    if not relpath then
+      return nil, ('%s is outside repo'):format(file)
+    end
+
+    if M.from_tree(revision) then
+      local stdout, stderr = self:get_show_text_at_revision(assert(revision), relpath)
+      if stderr then
+        return nil, stderr
+      end
+      if #stdout == 0 then
+        return nil, ('%s not found in %s'):format(relpath, revision)
+      end
+      return {
+        relpath = relpath,
+        mode_bits = default_mode_bits(Path.join(self.toplevel, relpath)),
+        object_name = revision,
+      }
+    end
+
+    return self:hg_file_info(relpath)
+  end
+
   if M.from_tree(revision) then
     local info, err = self:ls_tree(file, assert(revision))
     if err then

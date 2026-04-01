@@ -153,10 +153,9 @@ local test_file_text = {
   'static.',
 }
 
---- Run a git command
---- @param ... string
-function M.git(...)
-  local args = { ... } --- @type string[]
+--- @param args string[]
+--- @return string[]
+local function normalize_repo_args(args)
   local scratch0 = assert(M.normalize_path(M.scratch))
 
   for i, arg in ipairs(args) do
@@ -166,7 +165,21 @@ function M.git(...)
     end
   end
 
+  return args
+end
+
+--- Run a git command
+--- @param ... string
+function M.git(...)
+  local args = normalize_repo_args({ ... }) --- @type string[]
   system(vim.list_extend({ 'git', '-C', M.scratch }, args))
+end
+
+--- Run a mercurial command
+--- @param ... string
+function M.hg(...)
+  local args = normalize_repo_args({ ... }) --- @type string[]
+  system(vim.list_extend({ 'hg', '--cwd', M.scratch }, args))
 end
 
 function M.cleanup()
@@ -302,6 +315,16 @@ function M.git_init_scratch()
   M.git('config', 'init.defaultBranch', 'main')
 end
 
+function M.hg_init_scratch()
+  M.cleanup()
+  M.mkdir(M.scratch)
+  system({ 'hg', 'init', M.scratch })
+  M.write_to_file(M.scratch .. '/.hg/hgrc', {
+    '[ui]',
+    'username = tester <tester@com.com>',
+  })
+end
+
 --- Setup a basic git repository in directory `helpers.scratch` with a single file
 --- `helpers.test_file` committed.
 --- @param opts? {test_file_text?: string[], no_add?: boolean}
@@ -312,6 +335,22 @@ function M.setup_test_repo(opts)
   if not (opts and opts.no_add) then
     M.git('add', M.test_file)
     M.git('commit', '-m', 'init commit')
+  end
+end
+
+--- Setup a basic hg repository in directory `helpers.scratch` with a single file
+--- `helpers.test_file` optionally committed.
+--- @param opts? {test_file_text?: string[], no_add?: boolean, branch?: string}
+function M.setup_test_hg_repo(opts)
+  local text = opts and opts.test_file_text or test_file_text
+  M.hg_init_scratch()
+  M.write_to_file(M.test_file, text)
+  if opts and opts.branch then
+    M.hg('branch', opts.branch)
+  end
+  if not (opts and opts.no_add) then
+    M.hg('add', M.test_file)
+    M.hg('commit', '-m', 'init commit', '-u', 'tester')
   end
 end
 

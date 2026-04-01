@@ -24,6 +24,7 @@ local path_pattern = helpers.path_pattern
 local scratch = helpers.scratch
 local setup_hgsigns = helpers.setup_hgsigns
 local setup_test_repo = helpers.setup_test_repo
+local setup_test_hg_repo = helpers.setup_test_hg_repo
 local split = vim.split
 local test_config = helpers.test_config
 local test_file = helpers.test_file
@@ -135,27 +136,65 @@ describe('hgsigns (with screen)', function()
     })
   end)
 
+  it('attaches in a fresh hg repo and exposes .hg metadata', function()
+    --- @type integer
+    local nvim_ver = exec_lua('return vim.version().minor')
+    screen:try_resize(20, 6)
+    setup_test_hg_repo({ no_add = true })
+    config.watch_gitdir = { interval = 100 }
+    setup_hgsigns(config)
+    edit(test_file)
+
+    match_dag({
+      'attach.attach(1): Attaching (trigger=BufReadPost)',
+      p('system.system: hg %-%-config ui%.relative%-paths=false root'),
+      p('system.system: hg %-%-config ui%.relative%-paths=false branch'),
+      p('attach%.attach%(1%): Watching git dir .*%.hg'),
+    })
+
+    check({
+      status = { head = 'default', added = 18, changed = 0, removed = 0 },
+      signs = { untracked = nvim_ver == 9 and 8 or 7 },
+    })
+
+    eq_path(scratch .. '/.hg', exec_lua([[return vim.b.hgsigns_status_dict.gitdir]]))
+  end)
+
+  it('reports slash hg branch names in buffer status', function()
+    setup_test_hg_repo({ branch = 'feature/foo' })
+    setup_hgsigns(config)
+    edit(test_file)
+    wait_for_attach()
+
+    check({
+      status = { head = 'feature/foo', added = 0, changed = 0, removed = 0 },
+      signs = {},
+    })
+
+    eq_path(scratch .. '/.hg', exec_lua([[return vim.b.hgsigns_status_dict.gitdir]]))
+  end)
+
   it('can open files not in a git repo', function()
     setup_hgsigns(config)
     local tmpfile = helpers.tempname()
     edit(tmpfile)
 
-    match_debug_messages({
+    match_dag({
       p(attach_open_pat),
-      np(revparse_pat),
-      np('Not in git repo'),
-      np('Empty git obj'),
+      p(revparse_pat),
+      p('git%.new: Not in git repo'),
+      p('attach%.attach%(1%): Empty git obj'),
     })
     command('Hgsigns clear_debug')
 
     insert('line')
     command('write')
 
-    match_debug_messages({
-      n('attach.attach(1): Attaching (trigger=BufWritePost)'),
-      np(revparse_pat),
-      n('git.new: Not in git repo'),
-      n('attach.attach(1): Empty git obj'),
+    match_dag({
+      p('attach%.attach%(1%): Attaching %(trigger=BufWritePost%)'),
+      p(revparse_pat),
+      p('git%.new: Not in git repo'),
+      p('attach%.attach%(1%): Empty git obj'),
     })
   end)
 
@@ -186,12 +225,14 @@ describe('hgsigns (with screen)', function()
     it('does not attach inside .git', function()
       edit(scratch .. '/.git/index')
 
-      match_debug_messages({
+      match_dag({
         'attach.attach(1): Attaching (trigger=BufReadPost)',
-        n('system.system: git --version'),
-        p(revparse_pat),
-        n('git.new: Not in git repo'),
-        n('attach.attach(1): Empty git obj'),
+        p('system.system: hg %-%-config ui%.relative%-paths=false root'),
+        p('system.system: hg %-%-config ui%.relative%-paths=false branch'),
+        p('system.system: hg %-%-config ui%.relative%-paths=false parents %-%-template %{' .. 'node%}'),
+        p('system.system: hg %-%-config ui%.relative%-paths=false config ui%.username'),
+        p('system.system: hg %-%-config ui%.relative%-paths=false status %-A .*%.git[\\/]index'),
+        p('attach%.attach%(1%): Cannot resolve file in repo'),
       })
     end)
 
@@ -1288,9 +1329,10 @@ describe('hgsigns attach', function()
 
     edit(fn.tempname())
 
-    match_debug_messages({
-      p("get_info: '.*' is outside worktree '.*'"),
-      'attach.attach(1): Empty git obj',
+    match_dag({
+      p('system.system: hg %-%-config ui%.relative%-paths=false root'),
+      p("get_info_git: '.*' is outside worktree '.*'"),
+      p('attach%.attach%(1%): Empty git obj'),
     })
   end)
 end)
