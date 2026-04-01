@@ -355,6 +355,11 @@ local function run_blame_hg(obj, revision, opts)
     error(('Malformed hg annotate JSON for %s: missing lines'):format(obj.relpath))
   end
 
+  local parent_cache = {} --- @type table<string,string>
+  local parent_resolved = {} --- @type table<string,true>
+  local previous_path_cache = {} --- @type table<string,string>
+  local previous_path_resolved = {} --- @type table<string,true>
+
   for final_lnum, line in ipairs(lines) do
     if type(line) ~= 'table' then
       error(
@@ -376,11 +381,42 @@ local function run_blame_hg(obj, revision, opts)
       )
     end
 
+    local parent_key = sha
+    local parent_sha = parent_cache[parent_key] --- @type string?
+    if not parent_resolved[parent_key] then
+      parent_sha = obj.repo:get_parent_revision(sha)
+      if parent_sha then
+        parent_cache[parent_key] = parent_sha
+      end
+      parent_resolved[parent_key] = true
+    end
+
+    local previous_sha --- @type string?
+    local previous_filename --- @type string?
+    if parent_sha then
+      local previous_key = sha .. '\0' .. filename
+      local previous_path = previous_path_cache[previous_key] --- @type string?
+      if not previous_path_resolved[previous_key] then
+        previous_path = obj.repo:get_previous_path(sha, filename)
+        if previous_path then
+          previous_path_cache[previous_key] = previous_path
+        end
+        previous_path_resolved[previous_key] = true
+      end
+
+      if previous_path then
+        previous_sha = parent_sha
+        previous_filename = previous_path
+      end
+    end
+
     ret[final_lnum] = {
       final_lnum = final_lnum,
       orig_lnum = orig_lnum,
       commit = commits[sha],
       filename = filename,
+      previous_sha = previous_sha,
+      previous_filename = previous_filename,
     }
   end
 

@@ -11,19 +11,35 @@ local api = vim.api
 --- @async
 --- @param repo Hgsigns.Repo
 --- @param info Hgsigns.BlameInfoPublic
---- @return Hgsigns.Hunk.Hunk hunk
---- @return integer hunk_index
---- @return integer num_hunks
+--- @return Hgsigns.Hunk.Hunk? hunk
+--- @return integer? hunk_index
+--- @return integer? num_hunks
 --- @return integer? guess_offset If the hunk was not found at the exact line,
 ---                               return the offset from the original line to the
 ---                               hunk start.
+--- @return string? err
 local function get_blame_hunk(repo, info)
-  local a = repo:get_show_text(info.previous_sha .. ':' .. info.previous_filename)
-  local b = repo:get_show_text(info.sha .. ':' .. info.filename)
+  local previous_sha = assert(info.previous_sha)
+  local previous_filename = assert(info.previous_filename)
+
+  local a, err_a = repo:get_show_text_at_revision(previous_sha, previous_filename)
+  if err_a then
+    return nil, nil, nil, nil, err_a
+  end
+
+  local b, err_b = repo:get_show_text_at_revision(info.sha, info.filename)
+  if err_b then
+    return nil, nil, nil, nil, err_b
+  end
+
   local hunks = run_diff(a, b, false)
   local hunk, i = Hunks.find_hunk(info.orig_lnum, hunks)
   if hunk and i then
     return hunk, i, #hunks
+  end
+
+  if #hunks == 0 then
+    return nil, nil, nil, nil, 'no hunks in commit'
   end
 
   -- git-blame output is not always correct (see #1332)
@@ -39,10 +55,17 @@ local function get_blame_hunk(repo, info)
     local dist_p = math.abs(assert(hunks[i_prev]).added.start - info.orig_lnum)
     i = dist_n < dist_p and i_next or i_prev
   else
-    i = assert(i_next or i_prev, 'no hunks in commit')
+    i = i_next or i_prev
+    if not i then
+      return nil, nil, nil, nil, 'no hunks in commit'
+    end
   end
 
-  hunk = assert(hunks[i])
+  hunk = hunks[i]
+  if not hunk then
+    return nil, nil, nil, nil, 'no hunks in commit'
+  end
+
   return hunk, i, #hunks, hunk.added.start - info.orig_lnum
 end
 
@@ -51,7 +74,12 @@ end
 --- @param sha string
 --- @return Hgsigns.LineSpec
 local function create_commit_msg_body_linespec(repo, sha)
-  local body0 = repo:command({ 'show', '-s', '--format=%B', sha }, { text = true })
+  local body0
+  if repo.vcs == 'hg' then
+    body0 = repo:command({ 'log', '-r', sha, '-T', '{desc}' }, { text = true })
+  else
+    body0 = repo:command({ 'show', '-s', '--format=%B', sha }, { text = true })
+  end
   local body = table.concat(body0, '\n')
   return { { body, 'NormalFloat' } }
 end
@@ -68,7 +96,12 @@ local function create_blame_hunk_linespec(repo, info, fileformat)
 
   --- @type Hgsigns.LineSpec[]
   local ret = {}
-  local hunk, hunk_no, num_hunks, guess_offset = get_blame_hunk(repo, info)
+  local hunk, hunk_no, num_hunks, guess_offset, err = get_blame_hunk(repo, info)
+  if not (hunk and hunk_no and num_hunks) then
+    log.dprintf('Unable to resolve blame hunk for %s: %s', vim.inspect(info), tostring(err))
+    return { { { 'Unable to resolve blame hunk', 'WarningMsg' } } }
+  end
+  hunk = assert(hunk)
 
   local hunk_title = {
     { ('Hunk %d of %d'):format(hunk_no, num_hunks), 'Title' },

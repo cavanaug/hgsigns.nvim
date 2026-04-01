@@ -564,6 +564,53 @@ function M:get_show_text_at_revision(revision, relpath, encoding)
   return stdout, stderr
 end
 
+--- @async
+--- @param revision string
+--- @return string?
+function M:get_parent_revision(revision)
+  if self.vcs == 'hg' then
+    local stdout = self:command({ 'parents', '-r', revision, '-T', '{node}\n' }, {
+      ignore_error = true,
+    })
+    local parent = stdout[1]
+    return parent ~= '' and parent or nil
+  end
+
+  local stdout = self:command({ 'rev-parse', revision .. '^' }, { ignore_error = true })
+  local parent = stdout[1]
+  return parent ~= '' and parent or nil
+end
+
+--- @async
+--- @param revision string
+--- @param relpath string
+--- @return string?
+function M:get_previous_path(revision, relpath)
+  if self.vcs == 'hg' then
+    local parsed = parse_hg_status_lines(self:command({
+      'status',
+      '--copies',
+      '--change',
+      revision,
+      '--',
+      relpath,
+    }, { ignore_error = true })) or {}
+
+    for _, entry in ipairs(parsed) do
+      if entry.path == relpath then
+        if entry.status == 'A' then
+          return entry.oldpath
+        end
+        return relpath
+      end
+    end
+
+    return relpath
+  end
+
+  return self:diff_rename_status(revision, true)[relpath] or relpath
+end
+
 --- @type table<string,Hgsigns.Repo?>
 local repo_cache = setmetatable({}, { __mode = 'v' })
 

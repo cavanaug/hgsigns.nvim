@@ -185,7 +185,12 @@ local function reblame(opts, blame, win, revision, parent)
   local lnum = api.nvim_win_get_cursor(blm_win)[1]
   local sha = assert(blame[lnum]).commit.sha
   if parent then
-    sha = sha .. '^'
+    local src_buf = api.nvim_win_get_buf(win)
+    local bcache = cache[src_buf]
+    sha = bcache and bcache.git_obj.repo:get_parent_revision(sha) or (sha .. '^')
+    if not sha then
+      return
+    end
   end
   if sha == revision then
     return
