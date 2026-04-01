@@ -22,7 +22,7 @@ local n, p, np = helpers.n, helpers.p, helpers.np
 local newfile = helpers.newfile
 local path_pattern = helpers.path_pattern
 local scratch = helpers.scratch
-local setup_gitsigns = helpers.setup_gitsigns
+local setup_hgsigns = helpers.setup_hgsigns
 local setup_test_repo = helpers.setup_test_repo
 local split = vim.split
 local test_config = helpers.test_config
@@ -36,7 +36,7 @@ helpers.env()
 local function wait_for_attach(bufnr)
   expectf(function()
     return exec_lua(function(bufnr0)
-      return vim.b[bufnr0 or 0].gitsigns_status_dict.gitdir ~= nil
+      return vim.b[bufnr0 or 0].hgsigns_status_dict.gitdir ~= nil
     end, bufnr)
   end)
   match_debug_messages({
@@ -50,7 +50,7 @@ local revparse_pat = ('system.system: git .* rev-parse --show-toplevel --absolut
 )
 local attach_open_pat = 'attach%.attach%(1%): Attaching %(trigger=Buf%u%l+%u%l+%)'
 
-describe('gitsigns (with screen)', function()
+describe('hgsigns (with screen)', function()
   local screen --- @type test.screen
   local config --- @type table
 
@@ -97,7 +97,7 @@ describe('gitsigns (with screen)', function()
   end)
 
   it('can run basic setup', function()
-    setup_gitsigns()
+    setup_hgsigns()
     check({ status = {}, signs = {} })
   end)
 
@@ -108,7 +108,7 @@ describe('gitsigns (with screen)', function()
     setup_test_repo({ no_add = true })
     -- Don't set this too low, or else the test will lock up
     config.watch_gitdir = { interval = 100 }
-    setup_gitsigns(config)
+    setup_hgsigns(config)
     edit(test_file)
 
     match_dag({
@@ -136,7 +136,7 @@ describe('gitsigns (with screen)', function()
   end)
 
   it('can open files not in a git repo', function()
-    setup_gitsigns(config)
+    setup_hgsigns(config)
     local tmpfile = helpers.tempname()
     edit(tmpfile)
 
@@ -146,7 +146,7 @@ describe('gitsigns (with screen)', function()
       np('Not in git repo'),
       np('Empty git obj'),
     })
-    command('Gitsigns clear_debug')
+    command('Hgsigns clear_debug')
 
     insert('line')
     command('write')
@@ -162,7 +162,7 @@ describe('gitsigns (with screen)', function()
   describe('when attaching', function()
     before_each(function()
       setup_test_repo()
-      setup_gitsigns(config)
+      setup_hgsigns(config)
     end)
 
     it('can setup mappings', function()
@@ -173,12 +173,12 @@ describe('gitsigns (with screen)', function()
 
         -- Check all keymaps get set
         match_lines(res, {
-          n('n  mhS         *@<Cmd>lua require"gitsigns".stage_buffer()<CR>'),
-          n('n  mhU         *@<Cmd>lua require"gitsigns".reset_buffer_index()<CR>'),
-          n('n  mhp         *@<Cmd>lua require"gitsigns".preview_hunk()<CR>'),
-          n('n  mhr         *@<Cmd>lua require"gitsigns".reset_hunk()<CR>'),
-          n('n  mhs         *@<Cmd>lua require"gitsigns".stage_hunk()<CR>'),
-          n('n  mhu         *@<Cmd>lua require"gitsigns".undo_stage_hunk()<CR>'),
+          n('n  mhS         *@<Cmd>lua require"hgsigns".stage_buffer()<CR>'),
+          n('n  mhU         *@<Cmd>lua require"hgsigns".reset_buffer_index()<CR>'),
+          n('n  mhp         *@<Cmd>lua require"hgsigns".preview_hunk()<CR>'),
+          n('n  mhr         *@<Cmd>lua require"hgsigns".reset_hunk()<CR>'),
+          n('n  mhs         *@<Cmd>lua require"hgsigns".stage_hunk()<CR>'),
+          n('n  mhu         *@<Cmd>lua require"hgsigns".undo_stage_hunk()<CR>'),
         })
       end)
     end)
@@ -259,8 +259,8 @@ describe('gitsigns (with screen)', function()
         n('attach.attach(1): Not a path'),
       })
 
-      helpers.pcall_err(get_buf_var, 0, 'gitsigns_head')
-      helpers.pcall_err(get_buf_var, 0, 'gitsigns_status_dict')
+      helpers.pcall_err(get_buf_var, 0, 'hgsigns_head')
+      helpers.pcall_err(get_buf_var, 0, 'hgsigns_status_dict')
     end)
 
     it('can run copen', function()
@@ -285,7 +285,7 @@ describe('gitsigns (with screen)', function()
             added = { count = 2, start = 1, lines = { 'line1This', 'line2' } },
             removed = { count = 1, start = 1, lines = { 'This' } },
           },
-        }, exec_lua([[return require'gitsigns'.get_hunks()]]))
+        }, exec_lua([[return require'hgsigns'.get_hunks()]]))
       end)
     end)
   end)
@@ -294,7 +294,7 @@ describe('gitsigns (with screen)', function()
     before_each(function()
       config.current_line_blame = true
       config.current_line_blame_formatter = ' <author>, <author_time:%R> - <summary>'
-      setup_gitsigns(config)
+      setup_hgsigns(config)
     end)
 
     local function blame_line_ui_test(autocrlf, file_ending)
@@ -368,7 +368,7 @@ describe('gitsigns (with screen)', function()
       config.current_line_blame = true
       config.current_line_blame_formatter = ' <author>, <author_time:%R> - <summary>'
       config.current_line_blame_opts = { virt_text_pos = 'right_align' }
-      setup_gitsigns(config)
+      setup_hgsigns(config)
     end)
 
     it('with nowrap', function()
@@ -530,15 +530,15 @@ describe('gitsigns (with screen)', function()
   --   it('handled deprecated fields', function()
   --     pending()
   --     -- config.current_line_blame_delay = 100
-  --     -- setup_gitsigns(config)
-  --     -- eq(100, exec_lua([[return package.loaded['gitsigns.config'].config.current_line_blame_opts.delay]]))
+  --     -- setup_hgsigns(config)
+  --     -- eq(100, exec_lua([[return package.loaded['hgsigns.config'].config.current_line_blame_opts.delay]]))
   --   end)
   -- end)
 
   describe('on_attach()', function()
     it('can prevent attaching to a buffer', function()
       setup_test_repo({ no_add = true })
-      setup_gitsigns(config, true)
+      setup_hgsigns(config, true)
 
       edit(test_file)
       match_debug_messages({
@@ -566,15 +566,15 @@ describe('gitsigns (with screen)', function()
       git('add', test_file)
       git('commit', '-m', 'commit on main')
 
-      -- Don't setup gitsigns until the repo has two commits
-      setup_gitsigns(config)
+      -- Don't setup hgsigns until the repo has two commits
+      setup_hgsigns(config)
 
       check({
         status = { head = 'main', added = 0, changed = 0, removed = 0 },
         signs = {},
       })
 
-      command('Gitsigns change_base ~')
+      command('Hgsigns change_base ~')
 
       check({
         status = { head = 'main', added = 1, changed = 0, removed = 0 },
@@ -593,7 +593,7 @@ describe('gitsigns (with screen)', function()
       end)
 
       it('apply basic signs', function()
-        setup_gitsigns(config)
+        setup_hgsigns(config)
         edit(test_file)
         command('set signcolumn=yes')
 
@@ -615,7 +615,7 @@ describe('gitsigns (with screen)', function()
 
       it('can enable numhl', function()
         config.numhl = true
-        setup_gitsigns(config)
+        setup_hgsigns(config)
         edit(test_file)
         command('set signcolumn=no')
         command('set number')
@@ -655,7 +655,7 @@ describe('gitsigns (with screen)', function()
       end)
 
       it('attaches to newly created files', function()
-        setup_gitsigns(config)
+        setup_hgsigns(config)
         edit(newfile)
         local messages = {
           'attach.attach(1): Attaching (trigger=BufNewFile)',
@@ -699,7 +699,7 @@ describe('gitsigns (with screen)', function()
       end)
 
       it('can add untracked files to the index', function()
-        setup_gitsigns(config)
+        setup_hgsigns(config)
 
         edit(newfile)
         feed('iline<esc>')
@@ -722,7 +722,7 @@ describe('gitsigns (with screen)', function()
 
       it('can manually attach untracked files (#1026)', function()
         config.attach_to_untracked = false
-        setup_gitsigns(config)
+        setup_hgsigns(config)
 
         edit(newfile)
         feed('iline<esc>')
@@ -733,14 +733,14 @@ describe('gitsigns (with screen)', function()
           signs = {},
         })
 
-        command('Gitsigns attach')
+        command('Hgsigns attach')
 
         check({
           status = { head = 'main', added = 1, changed = 0, removed = 0 },
           signs = { untracked = 1 },
         })
 
-        command('Gitsigns stage_buffer')
+        command('Hgsigns stage_buffer')
 
         check({
           status = { head = 'main', added = 0, changed = 0, removed = 0 },
@@ -749,7 +749,7 @@ describe('gitsigns (with screen)', function()
       end)
 
       it('tracks files in new repos', function()
-        setup_gitsigns(config)
+        setup_hgsigns(config)
         helpers.touch(newfile)
         edit(newfile)
 
@@ -777,7 +777,7 @@ describe('gitsigns (with screen)', function()
       end)
 
       it('can detach from buffers', function()
-        setup_gitsigns(config)
+        setup_hgsigns(config)
         edit(test_file)
         command('set signcolumn=yes')
 
@@ -796,13 +796,13 @@ describe('gitsigns (with screen)', function()
           signs = { topdelete = 1, added = 1, changed = 1, delete = 1, changedelete = 1 },
         })
 
-        command('Gitsigns detach')
+        command('Hgsigns detach')
 
         check({ status = {}, signs = {} })
       end)
 
       it('can stages file with merge conflicts', function()
-        setup_gitsigns(config)
+        setup_hgsigns(config)
         command('set signcolumn=yes')
 
         -- Edit a file and commit it on main branch
@@ -834,20 +834,20 @@ describe('gitsigns (with screen)', function()
         -- test_file should have a conflict
         edit(test_file)
         check({
-          status = { head = 'HEAD(rebasing)', added = 4, changed = 1, removed = 0 },
-          signs = { changed = 1, added = 4 },
+          status = { head = 'HEAD(rebasing)', added = 6, changed = 0, removed = 0 },
+          signs = { added = 6 },
         })
 
         helpers.stage_hunk()
 
         check({
-          status = { head = 'HEAD(rebasing)', added = 0, changed = 0, removed = 0 },
-          signs = {},
+          status = { head = 'HEAD(rebasing)', added = 3, changed = 0, removed = 0 },
+          signs = { added = 3 },
         })
       end)
 
       it('handle files with spaces', function()
-        setup_gitsigns(config)
+        setup_hgsigns(config)
         command('set signcolumn=yes')
 
         local spacefile = scratch .. '/a b c d'
@@ -887,7 +887,7 @@ describe('gitsigns (with screen)', function()
     write_to_file(scratch .. '/t2.txt', { 'hello ben' })
     write_to_file(scratch .. '/t3.txt', { 'hello lewis' })
 
-    setup_gitsigns(config)
+    setup_hgsigns(config)
 
     helpers.exc_exec('vimgrep ben ' .. scratch .. '/*')
 
@@ -920,10 +920,10 @@ describe('gitsigns (with screen)', function()
     end
 
     match_debug_messages({
-      'gitsigns.attach_autocmd(2): Attaching is disabled',
-      n('gitsigns.attach_autocmd(3): Attaching is disabled'),
-      n('gitsigns.attach_autocmd(4): Attaching is disabled'),
-      n('gitsigns.attach_autocmd(5): Attaching is disabled'),
+      'hgsigns.attach_autocmd(2): Attaching is disabled',
+      n('hgsigns.attach_autocmd(3): Attaching is disabled'),
+      n('hgsigns.attach_autocmd(4): Attaching is disabled'),
+      n('hgsigns.attach_autocmd(5): Attaching is disabled'),
     })
   end)
 
@@ -933,18 +933,18 @@ describe('gitsigns (with screen)', function()
 
     -- Disable debug_mode so the sha is calculated
     config.debug_mode = false
-    setup_gitsigns(config)
+    setup_hgsigns(config)
     edit(test_file)
 
     -- SHA is not deterministic so just check it can be cast as a hex value
     expectf(function()
-      helpers.neq(nil, tonumber('0x' .. get_buf_var(0, 'gitsigns_head')))
+      helpers.neq(nil, tonumber('0x' .. get_buf_var(0, 'hgsigns_head')))
     end)
   end)
 
   it('handles a quick undo', function()
     setup_test_repo()
-    setup_gitsigns(config)
+    setup_hgsigns(config)
     edit(test_file)
     -- This test isn't deterministic so run it a few times
     for _ = 1, 3 do
@@ -963,9 +963,9 @@ describe('gitsigns (with screen)', function()
     git('add', other)
     git('commit', '-m', 'add other file')
 
-    setup_gitsigns(config)
+    setup_hgsigns(config)
     exec_lua(function()
-      require('gitsigns').statuscolumn(0, 1)
+      require('hgsigns').statuscolumn(0, 1)
     end)
 
     edit(test_file)
@@ -980,13 +980,13 @@ describe('gitsigns (with screen)', function()
 
     eq(
       {
-        '%#GitSignsChange#~%* ',
-        '%#GitSignsAdd#+%* ',
+        '%#HgsignsChange#~%* ',
+        '%#HgsignsAdd#+%* ',
       },
       exec_lua(function(test_buf0, other_buf0)
         return {
-          require('gitsigns').statuscolumn(test_buf0, 1),
-          require('gitsigns').statuscolumn(other_buf0, 1),
+          require('hgsigns').statuscolumn(test_buf0, 1),
+          require('hgsigns').statuscolumn(other_buf0, 1),
         }
       end, test_buf, other_buf)
     )
@@ -995,7 +995,7 @@ describe('gitsigns (with screen)', function()
   it('handles filenames with unicode characters', function()
     screen:try_resize(20, 2)
     setup_test_repo()
-    setup_gitsigns(config)
+    setup_hgsigns(config)
     local uni_filename = scratch .. '/föobær'
 
     write_to_file(uni_filename, { 'Lorem ipsum' })
@@ -1036,7 +1036,7 @@ describe('gitsigns (with screen)', function()
     screen:attach()
     screen:try_resize(20, 4)
     setup_test_repo()
-    setup_gitsigns(config)
+    setup_hgsigns(config)
     edit(test_file)
     feed('dd')
 
@@ -1079,7 +1079,7 @@ describe('gitsigns (with screen)', function()
 
   it('shows "No newline at end of file" in preview popup', function()
     setup_test_repo({ test_file_text = { 'a' } })
-    setup_gitsigns(config)
+    setup_hgsigns(config)
     screen:try_resize(30, 5)
     edit(test_file)
     wait_for_attach()
@@ -1096,7 +1096,7 @@ describe('gitsigns (with screen)', function()
   end)
 end)
 
-describe('gitsigns attach', function()
+describe('hgsigns attach', function()
   local config --- @type table
 
   before_each(function()
@@ -1110,11 +1110,11 @@ describe('gitsigns attach', function()
   end)
 
   --- @param bufnr integer
-  --- @param ctx Gitsigns.GitContext
+  --- @param ctx Hgsigns.GitContext
   local function attach_with_context(bufnr, ctx)
     exec_lua(function(bufnr0, ctx0)
-      local async = require('gitsigns.async')
-      async.run(require('gitsigns.attach').attach, bufnr0, ctx0, 'test'):wait(5000)
+      local async = require('hgsigns.async')
+      async.run(require('hgsigns.attach').attach, bufnr0, ctx0, 'test'):wait(5000)
     end, bufnr, ctx)
     wait_for_attach(bufnr)
   end
@@ -1136,7 +1136,7 @@ describe('gitsigns attach', function()
     git('add', path1, path2)
 
     config.base = 'HEAD'
-    setup_gitsigns(config)
+    setup_hgsigns(config)
     edit(path1)
     command('write')
     helpers.sleep(100)
@@ -1146,12 +1146,12 @@ describe('gitsigns attach', function()
     -- Note this test is testing the attach logic before the git_obj
     -- is created.
 
-    setup_gitsigns(config)
+    setup_hgsigns(config)
 
     -- Since this bufname isn't a valid path, Nvim will not trigger the
     -- BufNewFile autocmd, therefore we need to manually attach.
     edit(('fugitive://%s/.git//'):format(scratch))
-    command('Gitsigns attach')
+    command('Hgsigns attach')
     match_debug_messages({
       'attach.attach(1): Empty git obj',
     })
@@ -1167,12 +1167,12 @@ describe('gitsigns attach', function()
     git('add', file)
     git('commit', '-m', 'add nested file')
 
-    setup_gitsigns(config)
+    setup_hgsigns(config)
     edit(file)
     wait_for_attach()
 
     local result = exec_lua(function(bufnr)
-      local cache = assert(require('gitsigns.cache').cache[bufnr])
+      local cache = assert(require('hgsigns.cache').cache[bufnr])
       return {
         relpath = cache.git_obj.relpath,
         object_name = cache.git_obj.object_name or '',
@@ -1196,7 +1196,7 @@ describe('gitsigns attach', function()
     git('commit', '-m', 'add relative file')
 
     config.auto_attach = false
-    setup_gitsigns(config)
+    setup_hgsigns(config)
     edit(file)
 
     attach_with_context(api.nvim_get_current_buf(), {
@@ -1206,7 +1206,7 @@ describe('gitsigns attach', function()
     })
 
     local result = exec_lua(function(bufnr)
-      local cache = assert(require('gitsigns.cache').cache[bufnr])
+      local cache = assert(require('hgsigns.cache').cache[bufnr])
       return {
         relpath = cache.git_obj.relpath,
         object_name = cache.git_obj.object_name or '',
@@ -1227,20 +1227,20 @@ describe('gitsigns attach', function()
     git('commit', '-m', 'commit 1')
     command('cd ' .. vim.fs.dirname(file))
 
-    setup_gitsigns(config)
+    setup_hgsigns(config)
 
     edit('test')
     wait_for_attach()
 
-    command('Gitsigns show')
+    command('Hgsigns show')
     wait_for_attach()
 
     local gfile, toplevel, gitdir, abbrev_head = exec_lua(function()
-      local git_obj = assert(require('gitsigns.cache').cache[1]).git_obj
+      local git_obj = assert(require('hgsigns.cache').cache[1]).git_obj
       return git_obj.file, git_obj.repo.toplevel, git_obj.repo.gitdir, git_obj.repo.abbrev_head
     end)
 
-    eq(('gitsigns://%s//:0:sub/test'):format(gitdir), api.nvim_buf_get_name(0))
+    eq(('hgsigns://%s//:0:sub/test'):format(gitdir), api.nvim_buf_get_name(0))
 
     eq_path(file, gfile)
     eq_path(scratch, toplevel)
@@ -1250,14 +1250,14 @@ describe('gitsigns attach', function()
 
   it('does not error after git system callbacks (#1425)', function()
     setup_test_repo()
-    setup_gitsigns(config)
+    setup_hgsigns(config)
 
     edit(test_file)
     wait_for_attach()
 
     local ok = exec_lua(function()
-      local async = require('gitsigns.async')
-      local git_cmd = require('gitsigns.git.cmd')
+      local async = require('hgsigns.async')
+      local git_cmd = require('hgsigns.git.cmd')
 
       return async
         .run(function()
@@ -1279,7 +1279,7 @@ describe('gitsigns attach', function()
 
   it('does not error when attaching to files out of tree (#1297)', function()
     setup_test_repo()
-    setup_gitsigns(config)
+    setup_hgsigns(config)
 
     exec_lua(function(scratch0)
       vim.env.GIT_DIR = scratch0 .. '/.git'

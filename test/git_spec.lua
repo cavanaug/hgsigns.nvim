@@ -19,9 +19,9 @@ describe('git', function()
 
   it('serializes repo operations across objects in the same repo', function()
     local result = exec_lua(function()
-      local async = require('gitsigns.async')
-      local Obj = require('gitsigns.git').Obj
-      local Repo = require('gitsigns.git.repo')
+      local async = require('hgsigns.async')
+      local Obj = require('hgsigns.git').Obj
+      local Repo = require('hgsigns.git.repo')
       local uv = vim.uv or vim.loop ---@diagnostic disable-line: deprecated
 
       local sleep = async.wrap(2, function(timeout, cb)
@@ -84,8 +84,8 @@ describe('git', function()
     git('commit', '-m', 'rename file')
 
     local old_relpath = exec_lua(function(repo_dir)
-      local async = require('gitsigns.async')
-      local Repo = require('gitsigns.git.repo')
+      local async = require('hgsigns.async')
+      local Repo = require('hgsigns.git.repo')
 
       local repo = assert(async.run(Repo.get, repo_dir):wait(5000))
       return async
@@ -111,8 +111,8 @@ describe('git', function()
     git('commit', '-m', 'rename file')
 
     local old_relpath = exec_lua(function(repo_dir)
-      local async = require('gitsigns.async')
-      local Repo = require('gitsigns.git.repo')
+      local async = require('hgsigns.async')
+      local Repo = require('hgsigns.git.repo')
 
       local repo = assert(async.run(Repo.get, repo_dir):wait(5000))
       return async
@@ -136,8 +136,8 @@ describe('git', function()
     end
 
     local result = exec_lua(function(root)
-      local async = require('gitsigns.async')
-      local util = require('gitsigns.util')
+      local async = require('hgsigns.async')
+      local util = require('hgsigns.util')
 
       local unix_root = vim.trim(vim.fn.system({ 'cygpath', '--absolute', '--unix', root }))
       local mixed_root = vim.trim(vim.fn.system({ 'cygpath', '--absolute', '--mixed', root }))

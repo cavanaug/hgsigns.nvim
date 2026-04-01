@@ -8,7 +8,7 @@ helpers.env()
 --- @param hunks [string,integer,integer,integer,integer][]
 --- @return [string,integer,integer?][]
 local function calc_signs(hunks)
-  local hunks1 = {} --- @type Gitsigns.Hunk.Hunk[]
+  local hunks1 = {} --- @type Hgsigns.Hunk.Hunk[]
   for i, hunk in ipairs(hunks) do
     hunks1[i] = {
       added = { count = hunk[4], start = hunk[5] },
@@ -18,10 +18,10 @@ local function calc_signs(hunks)
   end
 
   local signs = exec_lua(
-    --- @param hunks0 Gitsigns.Hunk.Hunk[]
+    --- @param hunks0 Hgsigns.Hunk.Hunk[]
     function(hunks0)
-      local Hunks = require('gitsigns.hunks')
-      local signs0 = {} --- @type Gitsigns.Sign[]
+      local Hunks = require('hgsigns.hunks')
+      local signs0 = {} --- @type Hgsigns.Sign[]
       for i, hunk in ipairs(hunks0) do
         local prev_hunk, next_hunk = hunks0[i - 1], hunks0[i + 1]
         vim.list_extend(signs0, Hunks.calc_signs(prev_hunk, hunk, next_hunk))
@@ -42,7 +42,7 @@ describe('hunksigns', function()
   before_each(function()
     exec_lua(function(path)
       package.path = path
-      require('gitsigns').setup({ _new_sign_calc = true })
+      require('hgsigns').setup({ _new_sign_calc = true })
     end, package.path)
   end)
 

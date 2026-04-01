@@ -3,7 +3,7 @@ local helpers = require('test.gs_helpers')
 local exec_lua = helpers.exec_lua
 local eq = helpers.eq
 local setup_test_repo = helpers.setup_test_repo
-local setup_gitsigns = helpers.setup_gitsigns
+local setup_hgsigns = helpers.setup_hgsigns
 local test_config = helpers.test_config
 local edit = helpers.edit
 local test_file = helpers.test_file
@@ -16,12 +16,12 @@ helpers.env()
 describe('word diff', function()
   before_each(function()
     clear()
-    setup_gitsigns()
+    setup_hgsigns()
   end)
 
   it('treats whitespace padding as a single region', function()
     local rems, adds = exec_lua(function()
-      local diff = require('gitsigns.diff_int')
+      local diff = require('hgsigns.diff_int')
       local removed = { 'foo = 1', 'bar = 2' }
       local added = { 'foo     = 1', 'bar     = 2' }
       return diff.run_word_diff(removed, added)
@@ -38,7 +38,7 @@ describe('word diff', function()
 
   it('anchors indentation changes to the start of the line', function()
     local rems, adds = exec_lua(function()
-      local diff = require('gitsigns.diff_int')
+      local diff = require('hgsigns.diff_int')
       local removed = { '  foo = 1' }
       local added = { '        foo = 1' }
       return diff.run_word_diff(removed, added)
@@ -49,7 +49,7 @@ describe('word diff', function()
 
   it('highlights only changed characters inside a word', function()
     local rems, adds = exec_lua(function()
-      local diff = require('gitsigns.diff_int')
+      local diff = require('hgsigns.diff_int')
       local removed = { 'local foo = 1' }
       local added = { 'local foz = 1' }
       return diff.run_word_diff(removed, added)
@@ -75,7 +75,7 @@ describe('inline preview', function()
     setup_test_repo({ test_file_text = { 'éx' } })
     local config = vim.deepcopy(test_config)
     config.word_diff = true
-    setup_gitsigns(config)
+    setup_hgsigns(config)
     edit(test_file)
 
     exec_lua(function()
@@ -83,25 +83,25 @@ describe('inline preview', function()
     end)
 
     exec_lua(function()
-      require('gitsigns').refresh()
+      require('hgsigns').refresh()
     end)
 
     expectf(function()
-      local hunks = exec_lua("return require('gitsigns').get_hunks()")
+      local hunks = exec_lua("return require('hgsigns').get_hunks()")
       eq(1, #hunks)
     end)
 
     exec_lua(function()
-      require('gitsigns').preview_hunk_inline()
+      require('hgsigns').preview_hunk_inline()
     end)
 
     local start_col, end_col = exec_lua(function()
-      local ns = vim.api.nvim_get_namespaces().gitsigns_preview_inline
+      local ns = vim.api.nvim_get_namespaces().hgsigns_preview_inline
       local marks = vim.api.nvim_buf_get_extmarks(0, ns, 0, -1, { details = true })
       local start_col0, end_col0 --- @type integer?, integer?
       for _, mark in ipairs(marks) do
         local details = mark[4]
-        if details and details.hl_group == 'GitSignsChangeInline' then
+        if details and details.hl_group == 'HgsignsChangeInline' then
           start_col0 = mark[3]
           end_col0 = details.end_col
           break
@@ -127,28 +127,28 @@ describe('inline preview', function()
         'charlie',
       },
     })
-    setup_gitsigns(test_config)
+    setup_hgsigns(test_config)
     edit(test_file)
 
     helpers.api.nvim_buf_set_lines(0, 0, 2, false, {})
 
     expectf(function()
       local hunk = exec_lua(function()
-        return require('gitsigns').get_hunks()[1]
+        return require('hgsigns').get_hunks()[1]
       end)
       assert(hunk and hunk.removed.count == 2)
     end)
 
     local deleted_marks = exec_lua(function()
-      local async = require('gitsigns.async')
+      local async = require('hgsigns.async')
       local winid = async
         .run(function()
-          return require('gitsigns.actions.preview').preview_hunk_inline()
+          return require('hgsigns.actions.preview').preview_hunk_inline()
         end)
         :wait()
       assert(winid, 'preview window not found')
       local buf = vim.api.nvim_win_get_buf(winid)
-      local ns = vim.api.nvim_get_namespaces().gitsigns_preview_inline
+      local ns = vim.api.nvim_get_namespaces().hgsigns_preview_inline
       return #vim.api.nvim_buf_get_extmarks(buf, ns, 0, -1, { details = true })
     end)
 

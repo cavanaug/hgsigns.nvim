@@ -13,7 +13,7 @@ local match_debug_messages = helpers.match_debug_messages
 local n, p, np = helpers.n, helpers.p, helpers.np
 local normalize_path = helpers.normalize_path
 local path_pattern = helpers.path_pattern
-local setup_gitsigns = helpers.setup_gitsigns
+local setup_hgsigns = helpers.setup_hgsigns
 local test_file = helpers.test_file
 local git = helpers.git
 
@@ -48,8 +48,8 @@ describe('gitdir_watcher', function()
 
   it('can follow moved files', function()
     setup_test_repo()
-    setup_gitsigns(test_config)
-    command('Gitsigns clear_debug')
+    setup_hgsigns(test_config)
+    command('Hgsigns clear_debug')
     edit(test_file)
 
     local revparse_pat = ('system.system: git .* rev-parse --show-toplevel --absolute-git-dir --abbrev-ref HEAD'):gsub(
@@ -68,7 +68,7 @@ describe('gitdir_watcher', function()
 
     eq_bufs({ [1] = test_file })
 
-    command('Gitsigns clear_debug')
+    command('Hgsigns clear_debug')
 
     local test_file2 = test_file .. '2'
     git('mv', test_file, test_file2)
@@ -90,7 +90,7 @@ describe('gitdir_watcher', function()
 
     eq_bufs({ [1] = test_file2 })
 
-    command('Gitsigns clear_debug')
+    command('Hgsigns clear_debug')
 
     local test_file3 = test_file .. '3'
 
@@ -113,7 +113,7 @@ describe('gitdir_watcher', function()
 
     eq_bufs({ [1] = test_file3 })
 
-    command('Gitsigns clear_debug')
+    command('Hgsigns clear_debug')
 
     git('mv', test_file3, test_file)
 
@@ -146,12 +146,12 @@ describe('gitdir_watcher', function()
     git('add', test_file1)
     git('commit', '-m', 'init commit')
 
-    setup_gitsigns(test_config)
+    setup_hgsigns(test_config)
     edit(test_file1)
 
     helpers.expectf(function()
       return helpers.exec_lua(function()
-        return vim.b.gitsigns_status_dict.gitdir ~= nil
+        return vim.b.hgsigns_status_dict.gitdir ~= nil
       end)
     end)
 
@@ -164,12 +164,12 @@ describe('gitdir_watcher', function()
 
   it('preserves slash branch names on head updates', function()
     setup_test_repo()
-    setup_gitsigns(test_config)
+    setup_hgsigns(test_config)
     edit(test_file)
 
     helpers.expectf(function()
       return helpers.exec_lua(function()
-        return vim.b.gitsigns_status_dict.gitdir ~= nil
+        return vim.b.hgsigns_status_dict.gitdir ~= nil
       end)
     end)
 
@@ -192,7 +192,7 @@ describe('gitdir_watcher', function()
     git('add', f1, f2)
     git('commit', '-m', 'init commit')
 
-    setup_gitsigns(test_config)
+    setup_hgsigns(test_config)
 
     command('edit ' .. f1)
     helpers.feed('Aa<esc>')
@@ -218,8 +218,8 @@ describe('gitdir_watcher', function()
     helpers.setup_path()
 
     local result = helpers.exec_lua(function(scratch)
-      local async = require('gitsigns.async')
-      local Repo = require('gitsigns.git.repo')
+      local async = require('hgsigns.async')
+      local Repo = require('hgsigns.git.repo')
 
       local repo, err = async.run(Repo.get, scratch):wait(5000)
       assert(repo, err)
@@ -256,8 +256,8 @@ describe('gitdir_watcher', function()
     helpers.setup_path()
 
     local result = helpers.exec_lua(function(scratch)
-      local async = require('gitsigns.async')
-      local Repo = require('gitsigns.git.repo')
+      local async = require('hgsigns.async')
+      local Repo = require('hgsigns.git.repo')
 
       local repo, err = async.run(Repo.get, scratch):wait(5000)
       assert(repo, err)

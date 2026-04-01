@@ -1,6 +1,6 @@
 local helpers = require('test.gs_helpers')
 
-local setup_gitsigns = helpers.setup_gitsigns
+local setup_hgsigns = helpers.setup_hgsigns
 local feed = helpers.feed
 local test_file = helpers.test_file
 local edit = helpers.edit
@@ -21,7 +21,7 @@ describe('blame', function()
   before_each(function()
     clear()
     helpers.chdir_tmp()
-    setup_gitsigns(test_config)
+    setup_hgsigns(test_config)
   end)
 
   it('keeps cursor line on reblame', function()
@@ -38,15 +38,15 @@ describe('blame', function()
       signs = {},
     })
     exec_lua(function()
-      local async = require('gitsigns.async')
-      async.run(require('gitsigns.actions.blame').blame):raise_on_error()
+      local async = require('hgsigns.async')
+      async.run(require('hgsigns.actions.blame').blame):raise_on_error()
     end)
 
     eq(
       true,
       exec_lua(function()
         return vim.wait(10000, function()
-          return vim.bo.filetype == 'gitsigns-blame'
+          return vim.bo.filetype == 'hgsigns-blame'
         end)
       end)
     )
@@ -60,19 +60,18 @@ describe('blame', function()
       true,
       exec_lua(function(initial_name)
         return vim.wait(5000, function()
-          return vim.bo.filetype == 'gitsigns-blame'
-            and vim.api.nvim_buf_get_name(0) ~= initial_name
+          return vim.bo.filetype == 'hgsigns-blame' and vim.api.nvim_buf_get_name(0) ~= initial_name
         end)
       end, initial_blame_bufname)
     )
 
     eq({ 3, 0 }, helpers.api.nvim_win_get_cursor(0))
-    eq('gitsigns-blame', exec_lua('return vim.bo.filetype'))
+    eq('hgsigns-blame', exec_lua('return vim.bo.filetype'))
   end)
 
   it('uses a repo-relative path when running blame', function()
     local args = exec_lua(function()
-      local blame = require('gitsigns.git.blame')
+      local blame = require('hgsigns.git.blame')
 
       local captured_args
       local obj = {
@@ -129,15 +128,15 @@ describe('blame', function()
 
     expectf(function()
       return exec_lua(function()
-        return vim.b.gitsigns_status_dict.gitdir ~= nil
+        return vim.b.hgsigns_status_dict.gitdir ~= nil
       end)
     end)
 
     local result = exec_lua(function(file0)
-      local async = require('gitsigns.async')
+      local async = require('hgsigns.async')
       return async
         .run(function()
-          local Git = require('gitsigns.git')
+          local Git = require('hgsigns.git')
           local encoding = vim.bo.fileencoding
           if encoding == '' then
             encoding = 'utf-8'

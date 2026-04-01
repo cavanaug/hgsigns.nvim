@@ -19,17 +19,17 @@ describe('git locale', function()
     helpers.setup_test_repo({ no_add = true })
 
     helpers.exec_lua(function()
-      package.loaded['gitsigns.git.cmd'] = nil
-      local orig_git_cmd = require('gitsigns.git.cmd')
+      package.loaded['hgsigns.git.cmd'] = nil
+      local orig_git_cmd = require('hgsigns.git.cmd')
 
-      _G.gitsigns_git_envs = {}
+      _G.hgsigns_git_envs = {}
 
-      package.loaded['gitsigns.git.cmd'] = function(args, spec)
+      package.loaded['hgsigns.git.cmd'] = function(args, spec)
         spec = spec or {}
 
         local stdout, stderr, code = orig_git_cmd(args, spec)
 
-        _G.gitsigns_git_envs[#_G.gitsigns_git_envs + 1] = {
+        _G.hgsigns_git_envs[#_G.hgsigns_git_envs + 1] = {
           args = vim.deepcopy(args),
           env = vim.deepcopy(spec.env or {}),
         }
@@ -45,7 +45,7 @@ describe('git locale', function()
 
     local config = vim.deepcopy(helpers.test_config)
     config.watch_gitdir = { interval = 100 }
-    helpers.setup_gitsigns(config)
+    helpers.setup_hgsigns(config)
 
     helpers.edit(helpers.test_file)
 
@@ -55,12 +55,12 @@ describe('git locale', function()
 
     expectf(function()
       return helpers.exec_lua(function()
-        return _G.gitsigns_git_envs ~= nil and #_G.gitsigns_git_envs > 0
+        return _G.hgsigns_git_envs ~= nil and #_G.hgsigns_git_envs > 0
       end)
     end)
 
     local envs = helpers.exec_lua(function()
-      return _G.gitsigns_git_envs
+      return _G.hgsigns_git_envs
     end)
 
     for _, item in ipairs(envs) do

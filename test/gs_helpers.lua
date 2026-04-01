@@ -121,12 +121,12 @@ M.test_config = {
     untracked = { text = '#' },
   },
   on_attach = {
-    { 'n', 'mhs', '<cmd>lua require"gitsigns".stage_hunk()<CR>' },
-    { 'n', 'mhu', '<cmd>lua require"gitsigns".undo_stage_hunk()<CR>' },
-    { 'n', 'mhr', '<cmd>lua require"gitsigns".reset_hunk()<CR>' },
-    { 'n', 'mhp', '<cmd>lua require"gitsigns".preview_hunk()<CR>' },
-    { 'n', 'mhS', '<cmd>lua require"gitsigns".stage_buffer()<CR>' },
-    { 'n', 'mhU', '<cmd>lua require"gitsigns".reset_buffer_index()<CR>' },
+    { 'n', 'mhs', '<cmd>lua require"hgsigns".stage_hunk()<CR>' },
+    { 'n', 'mhu', '<cmd>lua require"hgsigns".undo_stage_hunk()<CR>' },
+    { 'n', 'mhr', '<cmd>lua require"hgsigns".reset_hunk()<CR>' },
+    { 'n', 'mhp', '<cmd>lua require"hgsigns".preview_hunk()<CR>' },
+    { 'n', 'mhS', '<cmd>lua require"hgsigns".stage_buffer()<CR>' },
+    { 'n', 'mhU', '<cmd>lua require"hgsigns".reset_buffer_index()<CR>' },
   },
   attach_to_untracked = true,
   update_debounce = 5,
@@ -140,7 +140,7 @@ local test_file_text = {
   'used',
   'for',
   'testing',
-  'gitsigns.',
+  'hgsigns.',
   'The',
   'content',
   "doesn't",
@@ -177,7 +177,7 @@ function M.cleanup()
 
     M.exec_lua(function(root, tmpdir0)
       pcall(function()
-        require('gitsigns').detach_all()
+        require('hgsigns').detach_all()
       end)
       pcall(vim.cmd, 'silent! noautocmd enew!')
       pcall(vim.cmd, 'silent! cd ' .. vim.fn.fnameescape(tmpdir0))
@@ -280,7 +280,7 @@ function M.git_init_scratch()
   M.mkdir(M.scratch)
   M.git('init', '-b', 'main')
 
-  -- Always force color to test settings don't interfere with gitsigns systems
+  -- Always force color to test settings don't interfere with hgsigns systems
   -- commands (addresses #23)
   M.git('config', 'color.branch', 'always')
   M.git('config', 'color.ui', 'always')
@@ -335,7 +335,7 @@ end
 --- @param range [integer, integer]?
 function M.stage_hunk(range)
   M.exec_lua(function(range0)
-    local async = require('gitsigns.async')
+    local async = require('hgsigns.async')
 
     if range0 == vim.NIL then
       range0 = nil
@@ -344,7 +344,7 @@ function M.stage_hunk(range)
     async
       .run(function()
         local err = async.await(1, function(cb)
-          require('gitsigns').stage_hunk(range0, nil, cb)
+          require('hgsigns').stage_hunk(range0, nil, cb)
         end)
         assert(not err, err)
       end)
@@ -459,7 +459,7 @@ end
 --- @return string[]
 function M.debug_messages()
   --- @type string[]
-  local r = exec_lua("return require'gitsigns.debug.log'.get(true)")
+  local r = exec_lua("return require'hgsigns.debug.log'.get(true)")
   for i, line in ipairs(r) do
     -- Remove leading timestamp
     r[i] = line:gsub('^[0-9.]+ D ', '')
@@ -493,7 +493,7 @@ end
 
 --- @param config? table
 --- @param on_attach? boolean
-function M.setup_gitsigns(config, on_attach)
+function M.setup_hgsigns(config, on_attach)
   M.setup_path()
   exec_lua(function(config0, on_attach0)
     if config0 and config0.on_attach then
@@ -509,7 +509,7 @@ function M.setup_gitsigns(config, on_attach)
         return false
       end
     end
-    require('gitsigns').setup(config0)
+    require('hgsigns').setup(config0)
     vim.o.diffopt = 'internal,filler,closeoff'
   end, config, on_attach)
 end
@@ -518,26 +518,26 @@ end
 --- @param bufnr integer
 local function check_status(status, bufnr)
   if next(status) == nil then
-    eq(false, pcall(buf_get_var, bufnr, 'gitsigns_head'), 'b:gitsigns_head is unexpectedly set')
+    eq(false, pcall(buf_get_var, bufnr, 'hgsigns_head'), 'b:hgsigns_head is unexpectedly set')
     eq(
       false,
-      pcall(buf_get_var, bufnr, 'gitsigns_status_dict'),
-      'b:gitsigns_status_dict is unexpectedly set'
+      pcall(buf_get_var, bufnr, 'hgsigns_status_dict'),
+      'b:hgsigns_status_dict is unexpectedly set'
     )
     return
   end
 
-  eq(status.head, buf_get_var(bufnr, 'gitsigns_head'), 'b:gitsigns_head does not match')
+  eq(status.head, buf_get_var(bufnr, 'hgsigns_head'), 'b:hgsigns_head does not match')
 
   --- @type table<string,string|integer>
-  local bstatus = buf_get_var(bufnr, 'gitsigns_status_dict')
+  local bstatus = buf_get_var(bufnr, 'hgsigns_status_dict')
 
   for _, i in ipairs({ 'added', 'changed', 'removed', 'head' }) do
-    eq(status[i], bstatus[i], string.format("status['%s'] did not match gitsigns_status_dict", i))
+    eq(status[i], bstatus[i], string.format("status['%s'] did not match hgsigns_status_dict", i))
   end
   -- Catch any extra keys
   for i, v in pairs(status) do
-    eq(v, bstatus[i], string.format("status['%s'] did not match gitsigns_status_dict", i))
+    eq(v, bstatus[i], string.format("status['%s'] did not match hgsigns_status_dict", i))
   end
 end
 
@@ -555,12 +555,12 @@ local function check_signs(signs, bufnr)
 
   for _, name in ipairs(buf_signs) do
     for t, hl in pairs({
-      added = 'GitSignsAdd',
-      changed = 'GitSignsChange',
-      delete = 'GitSignsDelete',
-      changedelete = 'GitSignsChangedelete',
-      topdelete = 'GitSignsTopdelete',
-      untracked = 'GitSignsUntracked',
+      added = 'HgsignsAdd',
+      changed = 'HgsignsChange',
+      delete = 'HgsignsDelete',
+      changedelete = 'HgsignsChangedelete',
+      topdelete = 'HgsignsTopdelete',
+      untracked = 'HgsignsUntracked',
     }) do
       if name == hl then
         act[t] = (act[t] or 0) + 1

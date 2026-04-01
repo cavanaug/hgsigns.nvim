@@ -7,7 +7,7 @@ local eq = helpers.eq
 local exec_lua = helpers.exec_lua
 local git = helpers.git
 local scratch = helpers.scratch
-local setup_gitsigns = helpers.setup_gitsigns
+local setup_hgsigns = helpers.setup_hgsigns
 local setup_test_repo = helpers.setup_test_repo
 local test_config = helpers.test_config
 local test_file = helpers.test_file
@@ -28,7 +28,7 @@ describe('qflist', function()
   it('diffs renamed files against their base path when using a base revision', function()
     setup_test_repo()
     command('cd ' .. scratch)
-    setup_gitsigns(vim.tbl_extend('force', test_config, { base = 'HEAD' }))
+    setup_hgsigns(vim.tbl_extend('force', test_config, { base = 'HEAD' }))
 
     local renamed = test_file .. '2'
     git('mv', test_file, renamed)
@@ -39,7 +39,7 @@ describe('qflist', function()
     end, renamed)
 
     exec_lua(function()
-      require('gitsigns.actions').setqflist('all', { open = false })
+      require('hgsigns.actions').setqflist('all', { open = false })
     end)
 
     helpers.expectf(function()

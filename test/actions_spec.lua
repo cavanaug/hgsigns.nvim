@@ -1,6 +1,6 @@
 local helpers = require('test.gs_helpers')
 
-local setup_gitsigns = helpers.setup_gitsigns
+local setup_hgsigns = helpers.setup_hgsigns
 local feed = helpers.feed
 local test_file = helpers.test_file
 local edit = helpers.edit
@@ -22,7 +22,7 @@ helpers.env()
 local function expect_hunks(exp_hunks)
   expectf(function()
     --- @type table[]
-    local hunks = exec_lua("return require('gitsigns').get_hunks()")
+    local hunks = exec_lua("return require('hgsigns').get_hunks()")
     if #exp_hunks ~= #hunks then
       local msg = {} --- @type string[]
       msg[#msg + 1] = ''
@@ -95,7 +95,7 @@ end
 --- @param range [integer, integer]?
 local function stage_hunk(range)
   exec_lua(function(range0)
-    local async = require('gitsigns.async')
+    local async = require('hgsigns.async')
 
     if range0 == vim.NIL then
       range0 = nil
@@ -104,7 +104,7 @@ local function stage_hunk(range)
     async
       .run(function()
         local err = async.await(1, function(cb)
-          require('gitsigns').stage_hunk(range0, nil, cb)
+          require('hgsigns').stage_hunk(range0, nil, cb)
         end)
         assert(not err, err)
       end)
@@ -114,10 +114,10 @@ end
 
 local function reset_buffer_index()
   exec_lua(function()
-    local async = require('gitsigns.async')
+    local async = require('hgsigns.async')
     async
       .run(function()
-        local err = async.await(1, require('gitsigns').reset_buffer_index)
+        local err = async.await(1, require('hgsigns').reset_buffer_index)
         assert(not err, err)
       end)
       :wait(1000)
@@ -135,7 +135,7 @@ describe('actions', function()
   before_each(function()
     clear()
     helpers.chdir_tmp()
-    setup_gitsigns(test_config)
+    setup_hgsigns(test_config)
   end)
 
   it('works with commands', function()
@@ -148,25 +148,25 @@ describe('actions', function()
       signs = { changed = 1 },
     })
 
-    command('Gitsigns stage_hunk')
+    command('Hgsigns stage_hunk')
     check({
       status = { head = 'main', added = 0, changed = 0, removed = 0 },
       signs = {},
     })
 
-    command('Gitsigns undo_stage_hunk')
+    command('Hgsigns undo_stage_hunk')
     check({
       status = { head = 'main', added = 0, changed = 1, removed = 0 },
       signs = { changed = 1 },
     })
 
-    command('Gitsigns stage_hunk')
+    command('Hgsigns stage_hunk')
     check({
       status = { head = 'main', added = 0, changed = 0, removed = 0 },
       signs = {},
     })
 
-    command('Gitsigns stage_hunk')
+    command('Hgsigns stage_hunk')
     check({
       status = { head = 'main', added = 0, changed = 1, removed = 0 },
       signs = { changed = 1 },
@@ -180,19 +180,19 @@ describe('actions', function()
       signs = { changed = 2 },
     })
 
-    command('Gitsigns stage_buffer')
+    command('Hgsigns stage_buffer')
     check({
       status = { head = 'main', added = 0, changed = 0, removed = 0 },
       signs = {},
     })
 
-    command('Gitsigns reset_buffer_index')
+    command('Hgsigns reset_buffer_index')
     check({
       status = { head = 'main', added = 0, changed = 2, removed = 0 },
       signs = { changed = 2 },
     })
 
-    command('Gitsigns reset_hunk')
+    command('Hgsigns reset_hunk')
     check({
       status = { head = 'main', added = 0, changed = 1, removed = 0 },
       signs = { changed = 1 },
@@ -208,10 +208,10 @@ describe('actions', function()
     })
 
     local lines = exec_lua(function()
-      local async = require('gitsigns.async')
+      local async = require('hgsigns.async')
       local commit_buf = async
         .run(function()
-          return require('gitsigns.actions.show_commit')('main', 'edit')
+          return require('hgsigns.actions.show_commit')('main', 'edit')
         end)
         :wait(1000)
 
@@ -223,7 +223,7 @@ describe('actions', function()
     end
   end)
 
-  it('does not emit duplicate GitSignsUpdate events for stage_hunk', function()
+  it('does not emit duplicate HgsignsUpdate events for stage_hunk', function()
     setup_test_repo()
     edit(test_file)
 
@@ -234,19 +234,19 @@ describe('actions', function()
     })
 
     exec_lua(function()
-      _G.test_gitsigns_update_events = {}
+      _G.test_hgsigns_update_events = {}
 
       vim.api.nvim_create_autocmd('User', {
-        group = vim.api.nvim_create_augroup('GitsignsUpdateTest', { clear = true }),
-        pattern = 'GitSignsUpdate',
+        group = vim.api.nvim_create_augroup('HgsignsUpdateTest', { clear = true }),
+        pattern = 'HgsignsUpdate',
         callback = function(args)
           local bufnr = args.data and args.data.buffer
           if bufnr ~= vim.api.nvim_get_current_buf() then
             return
           end
 
-          local status = vim.b[bufnr].gitsigns_status_dict
-          _G.test_gitsigns_update_events[#_G.test_gitsigns_update_events + 1] = {
+          local status = vim.b[bufnr].hgsigns_status_dict
+          _G.test_hgsigns_update_events[#_G.test_hgsigns_update_events + 1] = {
             added = status and status.added,
             changed = status and status.changed,
             removed = status and status.removed,
@@ -256,7 +256,7 @@ describe('actions', function()
       })
     end)
 
-    command('Gitsigns stage_hunk')
+    command('Hgsigns stage_hunk')
     check({
       status = { head = 'main', added = 0, changed = 0, removed = 0 },
       signs = {},
@@ -271,7 +271,7 @@ describe('actions', function()
         removed = 0,
         head = 'main',
       },
-    }, exec_lua('return _G.test_gitsigns_update_events'))
+    }, exec_lua('return _G.test_hgsigns_update_events'))
   end)
 
   it('preserves foldenable in diffthis windows after staging a hunk', function()
@@ -286,8 +286,8 @@ describe('actions', function()
     })
 
     exec_lua(function()
-      local async = require('gitsigns.async')
-      async.run(require('gitsigns.actions.diffthis').diffthis, nil, {}):wait(1000)
+      local async = require('hgsigns.async')
+      async.run(require('hgsigns.actions.diffthis').diffthis, nil, {}):wait(1000)
     end)
 
     local rev_win --- @type integer?
@@ -297,7 +297,7 @@ describe('actions', function()
       for _, win in ipairs(api.nvim_list_wins()) do
         if win ~= current then
           local buf = api.nvim_win_get_buf(win)
-          if api.nvim_buf_get_name(buf):find('^gitsigns://') then
+          if api.nvim_buf_get_name(buf):find('^hgsigns://') then
             rev_win = win
             break
           end
@@ -465,18 +465,18 @@ describe('actions', function()
     })
 
     check_cursor({ 6, 0 })
-    command('Gitsigns next_hunk') -- Wrap
+    command('Hgsigns next_hunk') -- Wrap
     check_cursor({ 1, 0 })
-    command('Gitsigns next_hunk')
+    command('Hgsigns next_hunk')
     check_cursor({ 4, 0 })
-    command('Gitsigns next_hunk')
+    command('Hgsigns next_hunk')
     check_cursor({ 6, 0 })
 
-    command('Gitsigns prev_hunk')
+    command('Hgsigns prev_hunk')
     check_cursor({ 4, 0 })
-    command('Gitsigns prev_hunk')
+    command('Hgsigns prev_hunk')
     check_cursor({ 1, 0 })
-    command('Gitsigns prev_hunk') -- Wrap
+    command('Hgsigns prev_hunk') -- Wrap
     check_cursor({ 6, 0 })
   end)
 
@@ -496,20 +496,20 @@ describe('actions', function()
     command('set nowrapscan')
 
     check_cursor({ 1, 0 })
-    command('Gitsigns next_hunk')
+    command('Hgsigns next_hunk')
     check_cursor({ 4, 0 })
-    command('Gitsigns next_hunk')
+    command('Hgsigns next_hunk')
     check_cursor({ 6, 0 })
-    command('Gitsigns next_hunk')
+    command('Hgsigns next_hunk')
     check_cursor({ 6, 0 })
 
     feed('G')
     check_cursor({ 18, 0 })
-    command('Gitsigns prev_hunk')
+    command('Hgsigns prev_hunk')
     check_cursor({ 6, 0 })
-    command('Gitsigns prev_hunk')
+    command('Hgsigns prev_hunk')
     check_cursor({ 4, 0 })
-    command('Gitsigns prev_hunk')
+    command('Hgsigns prev_hunk')
     check_cursor({ 4, 0 })
   end)
 
@@ -527,7 +527,7 @@ describe('actions', function()
     check({ status = { head = 'main', added = 0, changed = 0, removed = 0 } })
     feed('x')
     check({ status = { head = 'main', added = 0, changed = 1, removed = 0 } })
-    command('Gitsigns stage_hunk')
+    command('Hgsigns stage_hunk')
     check({ status = { head = 'main', added = 0, changed = 0, removed = 0 } })
   end)
 
@@ -545,7 +545,7 @@ describe('actions', function()
 
     expectf(function()
       return exec_lua(function()
-        return vim.b.gitsigns_status_dict.gitdir ~= nil
+        return vim.b.hgsigns_status_dict.gitdir ~= nil
       end)
     end)
 
@@ -553,7 +553,7 @@ describe('actions', function()
 
     expectf(function()
       local hunks = exec_lua(function(bufnr)
-        local cache = assert(require('gitsigns.cache').cache[bufnr])
+        local cache = assert(require('hgsigns.cache').cache[bufnr])
         return cache.hunks and #cache.hunks or 0
       end, api.nvim_get_current_buf())
 

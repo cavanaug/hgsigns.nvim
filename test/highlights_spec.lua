@@ -9,14 +9,14 @@ local test_config = helpers.test_config
 local expectf = helpers.expectf
 local match_dag = helpers.match_dag
 local p = helpers.p
-local setup_gitsigns = helpers.setup_gitsigns
+local setup_hgsigns = helpers.setup_hgsigns
 local eq = helpers.eq
 
 helpers.env()
 
 describe('highlights', function()
   local screen --- @type test.screen
-  local config --- @type Gitsigns.Config
+  local config --- @type Hgsigns.Config
 
   before_each(function()
     clear()
@@ -61,19 +61,19 @@ describe('highlights', function()
     config.linehl = true
     config._test_mode = true
 
-    setup_gitsigns(config)
+    setup_hgsigns(config)
 
     local nvim10 = helpers.fn.has('nvim-0.10') > 0
 
     expectf(function()
       match_dag({
-        p('Deriving GitSignsAdd from ' .. (nvim10 and 'Added' or 'DiffAdd')),
-        p('Deriving GitSignsAddLn from DiffAdd'),
-        p('Deriving GitSignsAddNr from GitSignsAdd'),
-        p('Deriving GitSignsChangeLn from DiffChange'),
-        p('Deriving GitSignsChangeNr from GitSignsChange'),
-        p('Deriving GitSignsDelete from ' .. (nvim10 and 'Removed' or 'DiffDelete')),
-        p('Deriving GitSignsDeleteNr from GitSignsDelete'),
+        p('Deriving HgsignsAdd from ' .. (nvim10 and 'Added' or 'DiffAdd')),
+        p('Deriving HgsignsAddLn from DiffAdd'),
+        p('Deriving HgsignsAddNr from HgsignsAdd'),
+        p('Deriving HgsignsChangeLn from DiffChange'),
+        p('Deriving HgsignsChangeNr from HgsignsChange'),
+        p('Deriving HgsignsDelete from ' .. (nvim10 and 'Removed' or 'DiffDelete')),
+        p('Deriving HgsignsDeleteNr from HgsignsDelete'),
       })
     end)
   end)
@@ -81,7 +81,7 @@ describe('highlights', function()
   it('update when colorscheme changes', function()
     command('set termguicolors')
     config.linehl = true
-    setup_gitsigns(config)
+    setup_hgsigns(config)
   end)
 
   it('get_temp_hl handles equal min/max', function()
@@ -89,15 +89,15 @@ describe('highlights', function()
     local res = helpers.exec_lua(function()
       vim.api.nvim_set_hl(0, 'Normal', { bg = 0x000000 })
 
-      package.loaded['gitsigns.highlight'] = nil
-      local hl = require('gitsigns.highlight')
+      package.loaded['hgsigns.highlight'] = nil
+      local hl = require('hgsigns.highlight')
 
       local name = hl.get_temp_hl(0, 0, 0, 0.5, true)
       local info = vim.api.nvim_get_hl(0, { name = name, link = false })
       return { name = name, fg = info.fg }
     end)
 
-    assert(res.name:match('^GitSignsColorTemp%.fg%.%d+$') ~= nil)
+    assert(res.name:match('^HgsignsColorTemp%.fg%.%d+$') ~= nil)
     eq(0x00007F, res.fg)
   end)
 end)

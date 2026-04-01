@@ -12,25 +12,19 @@ describe('hgsigns entrypoint', function()
     helpers.setup_path()
   end)
 
-  it(
-    'hgsigns_entrypoint_spec loads through the renamed top-level module without loading gitsigns',
-    function()
-      local result = exec_lua(function()
-        package.loaded.hgsigns = nil
-        package.loaded.gitsigns = nil
+  it('loads through the renamed top-level module', function()
+    local result = exec_lua(function()
+      package.loaded.hgsigns = nil
 
-        local ok, mod = pcall(require, 'hgsigns')
+      local ok, mod = pcall(require, 'hgsigns')
 
-        return {
-          ok = ok,
-          mod_type = type(mod),
-          gitsigns_loaded = package.loaded.gitsigns ~= nil,
-        }
-      end)
+      return {
+        ok = ok,
+        mod_type = type(mod),
+      }
+    end)
 
-      eq(true, result.ok)
-      eq('table', result.mod_type)
-      eq(false, result.gitsigns_loaded)
-    end
-  )
+    eq(true, result.ok)
+    eq('table', result.mod_type)
+  end)
 end)

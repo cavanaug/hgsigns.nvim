@@ -37,7 +37,7 @@ describe('debounce', function()
         return proxy
       end
 
-      local debounce_trailing = require('gitsigns.debounce').debounce_trailing
+      local debounce_trailing = require('hgsigns.debounce').debounce_trailing
       local debounced = debounce_trailing(1, function()
         error('GS_DEBOUNCE_TEST_CLOSE')
       end)
@@ -51,7 +51,7 @@ describe('debounce', function()
 
   it('prints a full stacktrace if the function errors', function()
     exec_lua(function()
-      local debounce_trailing = require('gitsigns.debounce').debounce_trailing
+      local debounce_trailing = require('hgsigns.debounce').debounce_trailing
       local debounced = debounce_trailing(1, function()
         error('GS_DEBOUNCE_TEST_STACK')
       end)
@@ -65,13 +65,13 @@ describe('debounce', function()
       messages = messages:gsub('\\', '/')
       assert(messages:match('debounce_spec.lua:%d+: GS_DEBOUNCE_TEST_STACK'), messages)
       assert(messages:match('stack traceback'), messages)
-      assert(messages:match('lua/gitsigns/debounce.lua'), messages)
+      assert(messages:match('lua/hgsigns/debounce.lua'), messages)
     end)
   end)
 
   it('debounces independently by hash key', function()
     exec_lua(function()
-      local debounce_trailing = require('gitsigns.debounce').debounce_trailing
+      local debounce_trailing = require('hgsigns.debounce').debounce_trailing
 
       _G._debounce_hash_calls = {}
 
@@ -101,7 +101,7 @@ describe('debounce', function()
 
   it('accepts a hash function for ids', function()
     exec_lua(function()
-      local debounce_trailing = require('gitsigns.debounce').debounce_trailing
+      local debounce_trailing = require('hgsigns.debounce').debounce_trailing
 
       _G._debounce_hash_fn_calls = {}
 
