@@ -12,6 +12,7 @@ local check_version = require('hgsigns.git.version').check
 local uv = vim.uv or vim.loop ---@diagnostic disable-line: deprecated
 
 local normalize_path --- @type fun(path?: string): string?
+local parse_hg_status_lines --- @type fun(lines: string[]): Hgsigns.Repo.HgStatusEntry[]?
 
 --- @class Hgsigns.RepoInfo
 --- @field gitdir string
@@ -43,6 +44,12 @@ end
 --- @return boolean
 local function is_not_in_hg_repo(stderr)
   return stderr ~= nil and stderr:match(errors.e.not_in_hg) ~= nil
+end
+
+--- @param stderr string?
+--- @return boolean
+local function is_missing_hg_revision_path(stderr)
+  return stderr ~= nil and stderr:match(': no such file in rev ') ~= nil
 end
 
 --- @param file string
@@ -381,9 +388,28 @@ end
 --- @async
 --- @param base string?
 --- @param include_untracked? boolean
---- @return {path:string, oldpath?:string}[]
+--- @return {path:string, oldpath?:string, status?:string}[]
 function M:files_changed(base, include_untracked)
-  local ret = {} --- @type {path:string, oldpath?:string}[]
+  local ret = {} --- @type {path:string, oldpath?:string, status?:string}[]
+
+  if self.vcs == 'hg' then
+    local args = { 'status', '--copies' }
+    if base and base ~= ':0' then
+      vim.list_extend(args, { '--rev', base })
+    end
+
+    local parsed = parse_hg_status_lines(self:command(args)) or {}
+    for _, entry in ipairs(parsed) do
+      if entry.status ~= '?' or include_untracked then
+        ret[#ret + 1] = {
+          path = entry.path,
+          oldpath = entry.oldpath,
+          status = entry.status,
+        }
+      end
+    end
+    return ret
+  end
 
   if base and base ~= ':0' then
     local results = self:command({ 'diff', '--name-status', base })
@@ -396,13 +422,14 @@ function M:files_changed(base, include_untracked)
         ret[#ret + 1] = {
           path = path,
           oldpath = renamed and parts[2] or nil,
+          status = status,
         }
       end
     end
     if include_untracked then
       local untracked = self:command({ 'ls-files', '--others', '--exclude-standard' })
       for _, path in ipairs(untracked) do
-        ret[#ret + 1] = { path = path }
+        ret[#ret + 1] = { path = path, status = '??' }
       end
     end
     return ret
@@ -413,7 +440,7 @@ function M:files_changed(base, include_untracked)
   for _, line in ipairs(results) do
     local status = line:sub(1, 2)
     if status:match('^.M') or (include_untracked and status == '??') then
-      ret[#ret + 1] = { path = line:sub(4, -1) }
+      ret[#ret + 1] = { path = line:sub(4, -1), status = status }
     end
   end
   return ret
@@ -493,36 +520,44 @@ end
 --- @param encoding? string
 --- @return string[] stdout, string? stderr
 function M:get_show_text_at_revision(revision, relpath, encoding)
+  local stdout, stderr
+
   if self.vcs == 'hg' then
-    local stdout, stderr = self:command({ 'cat', '-r', revision, relpath }, {
+    stdout, stderr = self:command({ 'cat', '-r', revision, relpath }, {
       text = false,
       ignore_error = true,
     })
-
-    if encoding and encoding ~= 'utf-8' and iconv_supported(encoding) then
-      for i, l in ipairs(stdout) do
-        stdout[i] = vim.iconv(l, encoding, 'utf-8')
-      end
-    end
-
-    return stdout, stderr
+  else
+    stdout, stderr = self:get_show_text(revision .. ':' .. relpath, encoding)
   end
 
-  local stdout, stderr = self:get_show_text(revision .. ':' .. relpath, encoding)
-
-  if
-    stderr
+  local missing_path = stderr
     and (
-      stderr:match(errors.e.path_does_not_exist)
+      (self.vcs == 'hg' and is_missing_hg_revision_path(stderr))
+      or stderr:match(errors.e.path_does_not_exist)
       or stderr:match(errors.e.path_exist_on_disk_but_not_in)
     )
-  then
+
+  if missing_path then
     log.dprintf('%s not found in %s looking for renames', relpath, revision)
     local old_path = self:diff_rename_status(revision, true)[relpath]
       or self:log_rename_status(revision, relpath)
     if old_path then
       log.dprintf('found rename %s -> %s', old_path, relpath)
-      stdout, stderr = self:get_show_text(revision .. ':' .. old_path, encoding)
+      if self.vcs == 'hg' then
+        stdout, stderr = self:command({ 'cat', '-r', revision, old_path }, {
+          text = false,
+          ignore_error = true,
+        })
+      else
+        stdout, stderr = self:get_show_text(revision .. ':' .. old_path, encoding)
+      end
+    end
+  end
+
+  if encoding and encoding ~= 'utf-8' and iconv_supported(encoding) then
+    for i, l in ipairs(stdout) do
+      stdout[i] = vim.iconv(l, encoding, 'utf-8')
     end
   end
 
@@ -549,16 +584,20 @@ function M._new(info)
     if config.watch_gitdir.enable then
       self._watcher = Watcher.new(self.gitdir, self.commondir, self.vcs)
       self._watcher:on_update(function()
-        local info2 = M.get_info(self.toplevel, self.gitdir, self.toplevel)
-        if not info2 then
-          return
-        end
+        async
+          .run(function()
+            local info2 = M.get_info(self.toplevel, self.gitdir, self.toplevel)
+            if not info2 then
+              return
+            end
 
-        self.head_oid = info2.head_oid
-        if self.abbrev_head ~= info2.abbrev_head then
-          self.abbrev_head = info2.abbrev_head
-          log.dprintf('HEAD changed, updating abbrev_head to %s', self.abbrev_head)
-        end
+            self.head_oid = info2.head_oid
+            if self.abbrev_head ~= info2.abbrev_head then
+              self.abbrev_head = info2.abbrev_head
+              log.dprintf('HEAD changed, updating abbrev_head to %s', self.abbrev_head)
+            end
+          end)
+          :raise_on_error()
       end)
     end
 
@@ -1176,11 +1215,74 @@ local function parse_name_status_line(line)
   return status, parts[2]
 end
 
+--- @class (exact) Hgsigns.Repo.HgStatusEntry
+--- @field status string
+--- @field path string
+--- @field oldpath? string
+
+--- @param lines string[]
+--- @return Hgsigns.Repo.HgStatusEntry[]?
+parse_hg_status_lines = function(lines)
+  local ret = {} --- @type Hgsigns.Repo.HgStatusEntry[]
+  local last_added --- @type Hgsigns.Repo.HgStatusEntry?
+
+  for _, line in ipairs(lines) do
+    if line ~= '' then
+      local status = line:sub(1, 1)
+      if status == ' ' then
+        local oldpath = line:sub(3)
+        if
+          not last_added
+          or last_added.status ~= 'A'
+          or last_added.oldpath ~= nil
+          or oldpath == ''
+        then
+          log.eprintf('Malformed mercurial status copy line: %q', line)
+          return nil
+        end
+        last_added.oldpath = oldpath
+      else
+        local path = line:sub(3)
+        if path == '' then
+          log.eprintf('Malformed mercurial status line: %q', line)
+          return nil
+        end
+
+        local entry = {
+          status = status,
+          path = path,
+        }
+        ret[#ret + 1] = entry
+        last_added = entry
+      end
+    end
+  end
+
+  return ret
+end
+
 --- @async
 --- @param revision string
 --- @param path string
 --- @return string?
 function M:log_rename_status(revision, path)
+  if self.vcs == 'hg' then
+    local parsed = parse_hg_status_lines(self:command({
+      'status',
+      '--copies',
+      '--rev',
+      revision,
+      path,
+    })) or {}
+
+    for _, entry in ipairs(parsed) do
+      if entry.path == path and entry.oldpath then
+        return entry.oldpath
+      end
+    end
+    return
+  end
+
   local out = self:command({
     'log',
     '--follow',
@@ -1200,6 +1302,26 @@ end
 --- @param invert? boolean
 --- @return table<string,string>
 function M:diff_rename_status(revision, invert)
+  if self.vcs == 'hg' then
+    local args = { 'status', '--copies' }
+    if revision then
+      vim.list_extend(args, { '--rev', revision })
+    end
+
+    local parsed = parse_hg_status_lines(self:command(args)) or {}
+    local ret = {} --- @type table<string,string>
+    for _, entry in ipairs(parsed) do
+      if entry.status == 'A' and entry.oldpath then
+        if invert then
+          ret[entry.path] = entry.oldpath
+        else
+          ret[entry.oldpath] = entry.path
+        end
+      end
+    end
+    return ret
+  end
+
   local out = self:command({
     'diff',
     '--name-status',

@@ -83,15 +83,33 @@ local function buildqflist(target)
         if diff_attrs[f] ~= 'unset' then
           local f_abs = r.toplevel .. '/' .. f
           local stat = uv.fs_stat(f_abs)
-          --- @type string
-          local obj
           if stat and stat.type == 'file' then
-            if config.base and config.base ~= ':0' then
-              obj = config.base .. ':' .. (changed_file.oldpath or f)
+            local base_relpath = changed_file.oldpath or f
+            local a --- @type string[]
+
+            if r.vcs == 'hg' then
+              local status = changed_file.status
+              if status == 'A' and not changed_file.oldpath then
+                a = { '' }
+              else
+                local revision = config.base and config.base ~= ':0' and config.base or r.head_oid
+                if revision then
+                  a = r:get_show_text_at_revision(revision, base_relpath)
+                else
+                  a = { '' }
+                end
+              end
             else
-              obj = ':0:' .. f
+              --- @type string
+              local obj
+              if config.base and config.base ~= ':0' then
+                obj = config.base .. ':' .. base_relpath
+              else
+                obj = ':0:' .. f
+              end
+              a = r:get_show_text(obj)
             end
-            local a = r:get_show_text(obj)
+
             local hunks = run_diff(a, util.file_lines(f_abs))
             hunks_to_qflist(f_abs, hunks, qflist)
           end

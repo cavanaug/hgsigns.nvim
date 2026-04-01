@@ -2,25 +2,28 @@
 local helpers = require('test.gs_helpers')
 
 local clear = helpers.clear
-local system = helpers.fn.system
-local edit = helpers.edit
-local eq = helpers.eq
-local setup_test_repo = helpers.setup_test_repo
 local cleanup = helpers.cleanup
 local command = helpers.api.nvim_command
-local test_config = helpers.test_config
-local match_debug_messages = helpers.match_debug_messages
-local n, p, np = helpers.n, helpers.p, helpers.np
+local edit = helpers.edit
+local eq = helpers.eq
+local eq_path = helpers.eq_path
+local exec_lua = helpers.exec_lua
+local expectf = helpers.expectf
+local get_buf_var = helpers.api.nvim_buf_get_var
+local hg = helpers.hg
+local match_dag = helpers.match_dag
 local normalize_path = helpers.normalize_path
 local path_pattern = helpers.path_pattern
 local setup_hgsigns = helpers.setup_hgsigns
+local setup_test_hg_repo = helpers.setup_test_hg_repo
+local test_config = helpers.test_config
 local test_file = helpers.test_file
-local git = helpers.git
+local write_to_file = helpers.write_to_file
 
 helpers.env()
 
 local function get_bufs()
-  local bufs = {} --- @type table<integer,string>
+  local bufs = {} --- @type table<integer, string>
   for _, b in ipairs(helpers.api.nvim_list_bufs()) do
     bufs[b] = normalize_path(helpers.api.nvim_buf_get_name(b))
   end
@@ -36,7 +39,16 @@ local function eq_bufs(expected)
   eq(normalized, get_bufs())
 end
 
-describe('gitdir_watcher', function()
+---@param bufnr? integer
+local function wait_for_attach(bufnr)
+  expectf(function()
+    return exec_lua(function(bufnr0)
+      return vim.b[bufnr0 or 0].hgsigns_status_dict.gitdir ~= nil
+    end, bufnr)
+  end)
+end
+
+describe('gitdir_watcher (mercurial)', function()
   before_each(function()
     clear()
     helpers.chdir_tmp()
@@ -46,151 +58,93 @@ describe('gitdir_watcher', function()
     cleanup()
   end)
 
-  it('can follow moved files', function()
-    setup_test_repo()
-    setup_hgsigns(test_config)
-    command('Hgsigns clear_debug')
-    edit(test_file)
+  it('follows moved hg files with spaces', function()
+    helpers.hg_init_scratch()
 
-    local revparse_pat = ('system.system: git .* rev-parse --show-toplevel --absolute-git-dir --abbrev-ref HEAD'):gsub(
-      '%-',
-      '%%-'
-    )
+    local old_name = helpers.scratch .. '/old name.txt'
+    local new_name = helpers.scratch .. '/new name.txt'
 
-    match_debug_messages({
-      'attach.attach(1): Attaching (trigger=BufReadPost)',
-      np(revparse_pat),
-      np('system.system: git .* config user.name'),
-      np('system.system: git .* ls%-files .* ' .. path_pattern(test_file)),
-      np('attach%.attach%(1%): Watching git dir .*'),
-      np('system.system: git .* show .*'),
-    })
-
-    eq_bufs({ [1] = test_file })
-
-    command('Hgsigns clear_debug')
-
-    local test_file2 = test_file .. '2'
-    git('mv', test_file, test_file2)
-
-    match_debug_messages({
-      p('git.repo.watcher.watcher.handler: Git dir update: .*'),
-      np('system.system: git .* ls%-files .* ' .. path_pattern(test_file)),
-      np('system.system: git .* diff %-%-name%-status .* %-%-cached'),
-      n('attach.handle_moved(1): File moved to dummy.txt2'),
-      np('system.system: git .* ls%-files .* ' .. path_pattern(test_file2)),
-      np(
-        'attach%.handle_moved%(1%): Renamed buffer 1 from '
-          .. path_pattern(test_file)
-          .. ' to '
-          .. path_pattern(test_file2)
-      ),
-      np('system.system: git .* show .*'),
-    })
-
-    eq_bufs({ [1] = test_file2 })
-
-    command('Hgsigns clear_debug')
-
-    local test_file3 = test_file .. '3'
-
-    git('mv', test_file2, test_file3)
-
-    match_debug_messages({
-      p('git.repo.watcher.watcher.handler: Git dir update: .*'),
-      np('system.system: git .* ls%-files .* ' .. path_pattern(test_file2)),
-      np('system.system: git .* diff %-%-name%-status .* %-%-cached'),
-      n('attach.handle_moved(1): File moved to dummy.txt3'),
-      np('system.system: git .* ls%-files .* ' .. path_pattern(test_file3)),
-      np(
-        'attach%.handle_moved%(1%): Renamed buffer 1 from '
-          .. path_pattern(test_file2)
-          .. ' to '
-          .. path_pattern(test_file3)
-      ),
-      np('system.system: git .* show .*'),
-    })
-
-    eq_bufs({ [1] = test_file3 })
-
-    command('Hgsigns clear_debug')
-
-    git('mv', test_file3, test_file)
-
-    match_debug_messages({
-      p('git.repo.watcher.watcher.handler: Git dir update: .*'),
-      np('system.system: git .* ls%-files .* ' .. path_pattern(test_file3)),
-      np('system.system: git .* diff %-%-name%-status .* %-%-cached'),
-      np('system.system: git .* ls%-files .* ' .. path_pattern(test_file)),
-      n('attach.handle_moved(1): Moved file reset'),
-      np('system.system: git .* ls%-files .* ' .. path_pattern(test_file)),
-      np(
-        'attach%.handle_moved%(1%): Renamed buffer 1 from '
-          .. path_pattern(test_file3)
-          .. ' to '
-          .. path_pattern(test_file)
-      ),
-      np('system.system: git .* show .*'),
-    })
-
-    eq_bufs({ [1] = test_file })
-  end)
-
-  it('can follow moved files with spaces', function()
-    helpers.git_init_scratch()
-
-    local test_file1 = helpers.scratch .. '/old name.txt'
-    local test_file2 = helpers.scratch .. '/new name.txt'
-
-    helpers.write_to_file(test_file1, { 'test' })
-    git('add', test_file1)
-    git('commit', '-m', 'init commit')
+    write_to_file(old_name, { 'test' })
+    hg('add', old_name)
+    hg('commit', '-m', 'init commit', '-u', 'tester')
 
     setup_hgsigns(test_config)
-    edit(test_file1)
+    edit(old_name)
+    wait_for_attach()
 
-    helpers.expectf(function()
-      return helpers.exec_lua(function()
-        return vim.b.hgsigns_status_dict.gitdir ~= nil
-      end)
+    command('Hgsigns clear_debug')
+    hg('mv', old_name, new_name)
+
+    expectf(function()
+      eq_bufs({ [1] = new_name })
     end)
 
-    git('mv', test_file1, test_file2)
-
-    helpers.expectf(function()
-      eq_bufs({ [1] = test_file2 })
-    end)
+    match_dag({
+      helpers.p('git%.repo%.watcher%.watcher%.handler: Git dir update:'),
+      helpers.p('attach%.handle_moved%(1%): File moved to new name%.txt'),
+      helpers.p(
+        'attach%.handle_moved%(1%): Renamed buffer 1 from '
+          .. path_pattern(old_name)
+          .. ' to '
+          .. path_pattern(new_name)
+      ),
+    })
   end)
 
-  it('preserves slash branch names on head updates', function()
-    setup_test_repo()
+  it('refreshes hg branch head and clears signs after external commit', function()
+    setup_test_hg_repo()
     setup_hgsigns(test_config)
     edit(test_file)
+    wait_for_attach()
 
-    helpers.expectf(function()
-      return helpers.exec_lua(function()
-        return vim.b.hgsigns_status_dict.gitdir ~= nil
-      end)
-    end)
+    helpers.feed('gg0Cbranch change<esc>')
+    command('write')
 
-    helpers.check({ status = { head = 'main', added = 0, changed = 0, removed = 0 } })
+    helpers.check({
+      status = { head = 'default', added = 0, changed = 1, removed = 0 },
+      signs = { changed = 1 },
+    })
 
-    git('checkout', '-B', 'feature/foo')
+    command('Hgsigns clear_debug')
+    hg('branch', 'feature/foo')
 
-    helpers.check({ status = { head = 'feature/foo', added = 0, changed = 0, removed = 0 } })
+    helpers.check({
+      status = { head = 'feature/foo', added = 0, changed = 1, removed = 0 },
+      signs = { changed = 1 },
+    })
+
+    match_dag({
+      helpers.p('git%.repo%.watcher%.watcher%.handler: Git dir update:'),
+      helpers.p('attach%.repo_update_handler%(1%): Watcher handler called for buffer 1'),
+    })
+
+    command('Hgsigns clear_debug')
+    hg('commit', '-m', 'external commit', '-u', 'tester')
+
+    helpers.check({
+      status = { head = 'feature/foo', added = 0, changed = 0, removed = 0 },
+      signs = {},
+    })
+
+    eq_path(test_file, helpers.api.nvim_buf_get_name(1))
+
+    match_dag({
+      helpers.p('git%.repo%.watcher%.watcher%.handler: Git dir update:'),
+      helpers.p('attach%.repo_update_handler%(1%): Watcher handler called for buffer 1'),
+    })
   end)
 
-  it('can debounce and throttle updates per buffer', function()
-    helpers.git_init_scratch()
+  it('debounces hg watcher refreshes across multiple buffers', function()
+    helpers.hg_init_scratch()
 
     local f1 = vim.fs.joinpath(helpers.scratch, 'file1')
     local f2 = vim.fs.joinpath(helpers.scratch, 'file2')
 
-    helpers.write_to_file(f1, { '1', '2', '3' })
-    helpers.write_to_file(f2, { '1', '2', '3' })
+    write_to_file(f1, { '1', '2', '3' })
+    write_to_file(f2, { '1', '2', '3' })
 
-    git('add', f1, f2)
-    git('commit', '-m', 'init commit')
+    hg('add', f1, f2)
+    hg('commit', '-m', 'init commit', '-u', 'tester')
 
     setup_hgsigns(test_config)
 
@@ -207,14 +161,14 @@ describe('gitdir_watcher', function()
     helpers.check({ signs = { changed = 1 } }, b1)
     helpers.check({ signs = { changed = 1 } }, b2)
 
-    git('add', f1, f2)
+    hg('commit', '-m', 'batch update', '-u', 'tester')
 
     helpers.check({ signs = {} }, b1)
     helpers.check({ signs = {} }, b2)
   end)
 
   it('gc proxy closes over handles without retaining watcher', function()
-    setup_test_repo()
+    setup_test_hg_repo()
     helpers.setup_path()
 
     local result = helpers.exec_lua(function(scratch)
@@ -252,7 +206,7 @@ describe('gitdir_watcher', function()
   end)
 
   it('garbage collects repo and watcher', function()
-    setup_test_repo()
+    setup_test_hg_repo()
     helpers.setup_path()
 
     local result = helpers.exec_lua(function(scratch)
@@ -265,8 +219,6 @@ describe('gitdir_watcher', function()
       local gitdir = repo.gitdir
       local watcher = repo._watcher
       local handles = {} --- @type uv.uv_fs_event_t[]
-      -- `watcher.handles` is a map from watched dir -> handle. Copy into a
-      -- list so we can assert every handle is closed after GC.
       for _, handle in pairs(watcher.handles) do
         handles[#handles + 1] = handle
       end
@@ -290,7 +242,6 @@ describe('gitdir_watcher', function()
       local weak = setmetatable({ repo, watcher }, { __mode = 'v' })
 
       --- @diagnostic disable-next-line: unused, assign-type-mismatch
-      --- assign to nil to allow gc
       watcher, repo = nil, nil
 
       vim.wait(2000, function()
