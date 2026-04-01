@@ -234,15 +234,17 @@ local function repo_update_handler(bufnr)
 
   Status.update(bufnr, { head = git_obj.repo.abbrev_head })
 
-  local was_tracked = git_obj.object_name ~= nil
+  local was_tracked = not git_obj:is_untracked()
   local old_relpath = git_obj.relpath
   local old_object_name = git_obj.object_name
   local old_mode_bits = git_obj.mode_bits
+  local old_file_state = git_obj.file_state
 
   git_obj:refresh()
 
   local new_object_name = git_obj.object_name
   local new_mode_bits = git_obj.mode_bits
+  local new_file_state = git_obj.file_state
 
   if not bcache:schedule() then
     dprint('buffer invalid (1)')
@@ -254,6 +256,7 @@ local function repo_update_handler(bufnr)
   if
     old_object_name ~= new_object_name
     or old_mode_bits ~= new_mode_bits
+    or old_file_state ~= new_file_state
     -- Invalidate when the repo HEAD moves (checkout, pull/rebase, etc). The
     -- file object can stay the same while the comparison base changes.
     or bcache.head_oid ~= head_oid
@@ -263,7 +266,7 @@ local function repo_update_handler(bufnr)
 
   bcache.head_oid = head_oid
 
-  if config.watch_gitdir.follow_files and was_tracked and not new_object_name then
+  if config.watch_gitdir.follow_files and was_tracked and git_obj:is_untracked() then
     -- File was tracked but is no longer tracked. Must of been removed or
     -- moved. Check if it was moved and switch to it.
     handle_moved(bufnr, old_relpath)
@@ -331,7 +334,7 @@ M.attach = throttle_async({ hash = 1 }, function(cbuf, ctx, aucmd)
   if not git_obj and not passed_ctx then
     for _, wt in ipairs(config.worktrees) do
       git_obj = git.Obj.new(file, revision, encoding, wt.gitdir, wt.toplevel)
-      if git_obj and git_obj.object_name then
+      if git_obj and not git_obj:is_untracked() then
         dprintf('Using worktree %s', vim.inspect(wt))
         break
       end
@@ -359,7 +362,7 @@ M.attach = throttle_async({ hash = 1 }, function(cbuf, ctx, aucmd)
     return
   end
 
-  local is_untracked = git_obj.object_name == nil
+  local is_untracked = git_obj:is_untracked()
 
   -- Manual attaches (`:Hgsigns attach`) should still be allowed for
   -- untracked buffers.

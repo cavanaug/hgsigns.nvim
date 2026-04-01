@@ -733,11 +733,14 @@ local function get_info_hg(dir, gitdir, worktree)
     return nil, string.format('got stderr: %s', branch_err or '')
   end
 
-  local parents_out, parents_err, parents_code = git_command({ 'parents', '--template', '{node}\n' }, {
-    ignore_error = true,
-    cwd = toplevel_r,
-    vcs = 'hg',
-  })
+  local parents_out, parents_err, parents_code = git_command(
+    { 'parents', '--template', '{node}\n' },
+    {
+      ignore_error = true,
+      cwd = toplevel_r,
+      vcs = 'hg',
+    }
+  )
   if parents_code > 0 then
     return nil, string.format('got stderr: %s', parents_err or '')
   end
@@ -922,6 +925,7 @@ function M:ls_tree(path, revision)
   }
 end
 
+--- @async
 --- @param relpath string
 --- @return Hgsigns.Repo.LsFiles.Result? info
 --- @return string? err
@@ -931,12 +935,23 @@ function M:hg_file_info(relpath)
   if code > 0 and stderr then
     local missing = stderr:match('^.-: No such file or directory$')
     if missing then
-      return {}, nil
+      local info = {
+        relpath = relpath,
+        file_state = 'removed',
+        mode_bits = default_mode_bits(Path.join(self.toplevel, relpath)),
+        object_name = self.head_oid,
+      } --- @type Hgsigns.Repo.LsFiles.Result
+      return info, nil
     end
     return nil, stderr
   end
 
-  local result = { relpath = relpath, mode_bits = default_mode_bits(Path.join(self.toplevel, relpath)) }
+  local result = {
+    relpath = relpath,
+    file_state = 'tracked',
+    mode_bits = default_mode_bits(Path.join(self.toplevel, relpath)),
+    object_name = self.head_oid,
+  } --- @type Hgsigns.Repo.LsFiles.Result
   local line = results[1]
 
   if not line or line == '' then
@@ -945,19 +960,33 @@ function M:hg_file_info(relpath)
 
   local status = line:sub(1, 1)
   if status == '?' then
+    result.file_state = 'unknown'
     result.object_name = nil
+  elseif status == 'A' then
+    result.file_state = 'added'
+    result.object_name = nil
+  elseif status == 'R' or status == '!' then
+    result.file_state = 'removed'
   elseif status == 'I' then
+    result.file_state = 'unknown'
     result.relpath = nil
-  else
-    result.object_name = self.head_oid
+    result.object_name = nil
+  elseif status ~= 'M' and status ~= 'C' then
+    result.file_state = 'unknown'
+    result.object_name = nil
+    log.eprintf('Unhandled mercurial status %q for %s', status, relpath)
   end
 
   return result
 end
 
+--- @alias Hgsigns.FileState 'unknown'|'added'|'tracked'|'removed'
+---
+--- @class (exact) Hgsigns.Repo.LsFiles.Result
 --- @field relpath? string nil if file is not in working tree
 --- @field mode_bits? string
---- @field object_name? string nil if file is untracked
+--- @field object_name? string nil if file has no parent object baseline
+--- @field file_state? Hgsigns.FileState
 --- @field i_crlf? boolean (requires git version >= 2.9)
 --- @field w_crlf? boolean (requires git version >= 2.9)
 --- @field has_conflicts? true
@@ -971,7 +1000,7 @@ function M:ls_files(file)
   if self.vcs == 'hg' then
     local relpath = to_relpath(self.toplevel, file)
     if not relpath then
-      return {}
+      return {} --[[@as Hgsigns.Repo.LsFiles.Result]]
     end
     return self:hg_file_info(relpath)
   end
@@ -1001,10 +1030,13 @@ function M:ls_files(file)
 
   local relpath_idx = has_eol and 2 or 1
 
-  local result = {}
+  local result = {
+    file_state = 'unknown',
+  } --- @type Hgsigns.Repo.LsFiles.Result
   for _, line in ipairs(results) do
     local parts = vim.split(line, '\t')
     if #parts > relpath_idx then -- tracked file
+      result.file_state = 'tracked'
       local attrs = vim.split(assert(parts[1]), '%s+')
       local stage = tonumber(attrs[3])
       if stage <= 1 then
@@ -1024,6 +1056,7 @@ function M:ls_files(file)
       end
     else -- untracked file
       result.relpath = parts[relpath_idx]
+      result.file_state = 'unknown'
     end
   end
 
@@ -1060,6 +1093,7 @@ function M:file_info(file, revision)
         relpath = relpath,
         mode_bits = default_mode_bits(Path.join(self.toplevel, relpath)),
         object_name = revision,
+        file_state = 'tracked',
       }
     end
 
@@ -1077,6 +1111,7 @@ function M:file_info(file, revision)
         relpath = info.relpath,
         mode_bits = info.mode_bits,
         object_name = info.object_name,
+        file_state = 'tracked',
       }
     end
   else

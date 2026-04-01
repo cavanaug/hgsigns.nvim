@@ -14,6 +14,7 @@ M.Repo = Repo
 --- @field i_crlf? boolean Object has crlf
 --- @field w_crlf? boolean Working copy has crlf
 --- @field mode_bits string
+--- @field file_state? Hgsigns.FileState
 ---
 --- Revision the object is tracking against. Nil for index
 --- @field revision? string
@@ -62,16 +63,35 @@ function Obj:refresh()
     return err
   end
 
+  --- @cast info Hgsigns.Repo.LsFiles.Result
+
   self.relpath = info.relpath
   self.object_name = info.object_name
   self.mode_bits = info.mode_bits
+  self.file_state = info.file_state
   self.has_conflicts = info.has_conflicts
   self.i_crlf = info.i_crlf
   self.w_crlf = info.w_crlf
+
+  log.dprintf(
+    'Refreshed %s: state=%s relpath=%s object_name=%s',
+    self.file,
+    tostring(self.file_state),
+    tostring(self.relpath),
+    tostring(self.object_name)
+  )
 end
 
 function Obj:from_tree()
   return Repo.from_tree(self.revision)
+end
+
+function Obj:is_untracked()
+  return self.file_state == nil or self.file_state == 'unknown'
+end
+
+function Obj:has_staging_area()
+  return self.repo.vcs == 'git'
 end
 
 --- @async
@@ -86,7 +106,11 @@ function Obj:get_show_text(revision, relpath)
   end
 
   if not revision and not self.object_name then
-    log.dprint('no revision or object_name')
+    if self.file_state == 'removed' and self.relpath and self.repo.head_oid then
+      return self.repo:get_show_text_at_revision(self.repo.head_oid, self.relpath, self.encoding)
+    end
+
+    log.dprintf('using empty baseline for %s state=%s', self.file, tostring(self.file_state))
     return { '' }
   end
 
@@ -96,7 +120,8 @@ function Obj:get_show_text(revision, relpath)
     stdout, stderr = self.repo:get_show_text_at_revision(revision, relpath, self.encoding)
   elseif self.repo.vcs == 'hg' then
     --- @cast relpath -?
-    stdout, stderr = self.repo:get_show_text_at_revision(assert(self.object_name), relpath, self.encoding)
+    stdout, stderr =
+      self.repo:get_show_text_at_revision(assert(self.object_name), relpath, self.encoding)
   else
     stdout, stderr = self.repo:get_show_text(assert(self.object_name), self.encoding)
   end
@@ -265,6 +290,8 @@ function Obj.new(file, revision, encoding, gitdir, toplevel)
     return
   end
 
+  --- @cast info Hgsigns.Repo.LsFiles.Result
+
   if info.relpath then
     file = util.Path.join(repo.toplevel, info.relpath)
   end
@@ -278,6 +305,7 @@ function Obj.new(file, revision, encoding, gitdir, toplevel)
   self.relpath = info.relpath
   self.object_name = info.object_name
   self.mode_bits = info.mode_bits
+  self.file_state = info.file_state
   self.has_conflicts = info.has_conflicts
   self.i_crlf = info.i_crlf
   self.w_crlf = info.w_crlf

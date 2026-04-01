@@ -118,9 +118,10 @@ end
 --- @param clear? boolean
 local function apply_win_signs(bufnr, top, bot, clear)
   local bcache = assert(cache[bufnr])
-  local untracked = bcache.git_obj.object_name == nil
+  local git_obj = bcache.git_obj
+  local untracked = git_obj:is_untracked()
   apply_win_signs0(bufnr, signs_normal, bcache.hunks, top, bot, clear, untracked)
-  if signs_staged then
+  if signs_staged and git_obj:has_staging_area() then
     apply_win_signs0(
       bufnr,
       signs_staged,
@@ -176,7 +177,7 @@ function M.on_lines(buf, first, last_orig, last_new)
   end
 
   signs_normal:on_lines(buf, first, last_orig, last_new)
-  if signs_staged then
+  if signs_staged and bcache.git_obj:has_staging_area() then
     signs_staged:on_lines(buf, first, last_orig, last_new)
   end
 
@@ -187,7 +188,7 @@ function M.on_lines(buf, first, last_orig, last_new)
     bcache.force_next_update = true
   end
 
-  if signs_staged then
+  if signs_staged and bcache.git_obj:has_staging_area() then
     if bcache.hunks_staged and signs_staged:contains(buf, first, last_new) then
       -- Force a sign redraw on the next update (fixes #521)
       bcache.force_next_update = true
@@ -413,9 +414,11 @@ M.update = throttle_async({ hash = 1, schedule = true }, function(bufnr)
 
     local bufname = api.nvim_buf_get_name(bufnr)
     local rev_is_index = not git_obj:from_tree()
+    local supports_staged_signs = git_obj:has_staging_area()
 
     if
-      config.signs_staged_enable
+      supports_staged_signs
+      and config.signs_staged_enable
       and not file_mode
       and (rev_is_index or bufname:match('^fugitive://') or bufname:match('^hgsigns://'))
     then
@@ -439,6 +442,9 @@ M.update = throttle_async({ hash = 1, schedule = true }, function(bufnr)
         return
       end
       bcache.hunks_staged = Hunks.filter_common(hunks_head, bcache.hunks)
+    else
+      bcache.compare_text_head = nil
+      bcache.hunks_staged = nil
     end
 
     -- Note the decoration provider may have invalidated bcache.hunks at this

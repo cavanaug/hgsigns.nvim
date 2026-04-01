@@ -580,19 +580,36 @@ local function check_status(status, bufnr)
   end
 end
 
---- @param signs table<string,integer>
 --- @param bufnr integer
-local function check_signs(signs, bufnr)
+--- @param matcher fun(name: string): string?
+--- @return table<string, integer>
+--- @return string[]
+local function collect_sign_counts(bufnr, matcher)
   local buf_signs = {} --- @type string[]
   local buf_marks = helpers.api.nvim_buf_get_extmarks(bufnr, -1, 0, -1, { details = true })
   for _, s in ipairs(buf_marks) do
-    buf_signs[#buf_signs + 1] = assert(s[4]).sign_hl_group
+    local details = s[4]
+    local sign_hl_group = details and details.sign_hl_group
+    if sign_hl_group then
+      buf_signs[#buf_signs + 1] = sign_hl_group
+    end
   end
 
-  --- @type table<string,integer>
-  local act = {}
-
+  local act = {} --- @type table<string, integer>
   for _, name in ipairs(buf_signs) do
+    local kind = matcher(name)
+    if kind then
+      act[kind] = (act[kind] or 0) + 1
+    end
+  end
+
+  return act, buf_signs
+end
+
+--- @param signs table<string,integer>
+--- @param bufnr integer
+local function check_signs(signs, bufnr)
+  local act, buf_signs = collect_sign_counts(bufnr, function(name)
     for t, hl in pairs({
       added = 'HgsignsAdd',
       changed = 'HgsignsChange',
@@ -602,15 +619,35 @@ local function check_signs(signs, bufnr)
       untracked = 'HgsignsUntracked',
     }) do
       if name == hl then
-        act[t] = (act[t] or 0) + 1
+        return t
       end
     end
-  end
+  end)
 
   eq(signs, act, vim.inspect(buf_signs))
 end
 
---- @param attrs {signs?:table<string,integer>,status?:table<string,string|integer>}
+--- @param signs table<string,integer>
+--- @param bufnr integer
+local function check_staged_signs(signs, bufnr)
+  local act, buf_signs = collect_sign_counts(bufnr, function(name)
+    for t, hl in pairs({
+      added = 'HgsignsStagedAdd',
+      changed = 'HgsignsStagedChange',
+      delete = 'HgsignsStagedDelete',
+      changedelete = 'HgsignsStagedChangedelete',
+      topdelete = 'HgsignsStagedTopdelete',
+    }) do
+      if name == hl then
+        return t
+      end
+    end
+  end)
+
+  eq(signs, act, vim.inspect(buf_signs))
+end
+
+--- @param attrs {signs?:table<string,integer>,staged_signs?:table<string,integer>,status?:table<string,string|integer>}
 --- @param bufnr? integer
 function M.check(attrs, bufnr)
   bufnr = bufnr or 0
@@ -625,6 +662,10 @@ function M.check(attrs, bufnr)
 
     if attrs.signs then
       check_signs(attrs.signs, bufnr)
+    end
+
+    if attrs.staged_signs then
+      check_staged_signs(attrs.staged_signs, bufnr)
     end
   end)
 end

@@ -229,7 +229,10 @@ describe('hgsigns (with screen)', function()
         'attach.attach(1): Attaching (trigger=BufReadPost)',
         p('system.system: hg %-%-config ui%.relative%-paths=false root'),
         p('system.system: hg %-%-config ui%.relative%-paths=false branch'),
-        p('system.system: hg %-%-config ui%.relative%-paths=false parents %-%-template %{' .. 'node%}'),
+        p(
+          'system.system: hg %-%-config ui%.relative%-paths=false parents %-%-template %{'
+            .. 'node%}'
+        ),
         p('system.system: hg %-%-config ui%.relative%-paths=false config ui%.username'),
         p('system.system: hg %-%-config ui%.relative%-paths=false status %-A .*%.git[\\/]index'),
         p('attach%.attach%(1%): Cannot resolve file in repo'),
@@ -920,6 +923,132 @@ describe('hgsigns (with screen)', function()
   --   - internal diff (ffi)
   --   - decoration provider
   describe('diff-int', testsuite(true))
+
+  describe('mercurial hunks', function()
+    before_each(function()
+      config.diff_opts = {
+        internal = true,
+      }
+      setup_test_hg_repo()
+      setup_hgsigns(config)
+    end)
+
+    it('renders hg add files from an empty parent baseline without staged signs', function()
+      write_to_file(newfile, { 'alpha', 'beta' })
+      helpers.hg('add', newfile)
+
+      edit(newfile)
+      wait_for_attach()
+
+      check({
+        status = { head = 'default', added = 2, changed = 0, removed = 0 },
+        signs = { added = 2 },
+        staged_signs = {},
+      })
+
+      local result = exec_lua(function(bufnr)
+        local bcache = assert(require('hgsigns.cache').cache[bufnr])
+        return {
+          file_state = bcache.git_obj.file_state,
+          compare_text = bcache.compare_text,
+          staged_hunks = bcache.hunks_staged and #bcache.hunks_staged or 0,
+        }
+      end, api.nvim_get_current_buf())
+
+      eq('added', result.file_state)
+      eq({ '' }, result.compare_text)
+      eq(0, result.staged_hunks)
+    end)
+
+    it('navigates previews and resets mercurial hunks against parent content', function()
+      edit(test_file)
+      wait_for_attach()
+
+      feed('ggccEDIT<esc>')
+      feed('5GoADDED<esc>')
+      feed('10Gdd')
+
+      check({
+        status = { head = 'default', added = 1, changed = 1, removed = 1 },
+        signs = { changed = 1, added = 1, delete = 1 },
+        staged_signs = {},
+      })
+
+      local starts = exec_lua(function()
+        local hunks = assert(require('hgsigns').get_hunks())
+        return vim.tbl_map(function(hunk)
+          return hunk.added.start
+        end, hunks)
+      end)
+
+      eq(3, #starts)
+
+      command([[lua require('hgsigns').nav_hunk('first', { navigation_message = false })]])
+      expectf(function()
+        eq(math.max(starts[1], 1), api.nvim_win_get_cursor(0)[1])
+      end)
+
+      command([[lua require('hgsigns').preview_hunk()]])
+      local preview_lines = exec_lua(function()
+        local popup = require('hgsigns.popup')
+        local winid = assert(popup.is_open('hunk'))
+        local bufnr = vim.api.nvim_win_get_buf(winid)
+        return vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+      end)
+      match_lines(preview_lines, {
+        n('Hunk 1 of 3'),
+        n('-This'),
+        n('+EDIT'),
+      })
+
+      command([[lua require('hgsigns').nav_hunk('next', { navigation_message = false })]])
+      expectf(function()
+        eq(math.max(starts[2], 1), api.nvim_win_get_cursor(0)[1])
+      end)
+
+      command([[lua require('hgsigns').reset_buffer()]])
+
+      check({
+        status = { head = 'default', added = 0, changed = 0, removed = 0 },
+        signs = {},
+        staged_signs = {},
+      })
+      eq('This', api.nvim_buf_get_lines(0, 0, 1, false)[1])
+    end)
+
+    it('reports mercurial file states for unknown and removed files', function()
+      local unknown = scratch .. '/unknown.txt'
+      write_to_file(unknown, { 'mystery' })
+      helpers.hg('remove', test_file)
+
+      local states = exec_lua(function(unknown0, removed0)
+        local async = require('hgsigns.async')
+        return async
+          .run(function()
+            local Repo = require('hgsigns.git').Repo
+            local repo = assert(Repo.get(vim.fs.dirname(unknown0), nil, nil))
+            local unknown_info = assert(repo:file_info(unknown0))
+            local removed_info = assert(repo:file_info(removed0))
+            return {
+              unknown = {
+                file_state = unknown_info.file_state,
+                relpath = unknown_info.relpath,
+              },
+              removed = {
+                file_state = removed_info.file_state,
+                relpath = removed_info.relpath,
+              },
+            }
+          end)
+          :wait(5000)
+      end, unknown, test_file)
+
+      eq('unknown', states.unknown.file_state)
+      eq('unknown.txt', states.unknown.relpath)
+      eq('removed', states.removed.file_state)
+      eq('dummy.txt', states.removed.relpath)
+    end)
+  end)
 
   it('can handle vimgrep', function()
     setup_test_repo()
