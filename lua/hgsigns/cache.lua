@@ -102,6 +102,29 @@ end
 -- at a time.
 local BLAME_THRESHOLD_LEN = 10000
 
+--- @param blame table<integer,Hgsigns.BlameInfo?>
+--- @param hunks? Hgsigns.Hunk.Hunk[]
+--- @param relpath string
+--- @return boolean
+local function overlay_hunk_blame(blame, hunks, relpath)
+  local Blame = require('hgsigns.git.blame')
+
+  for _, hunk in ipairs(hunks or {}) do
+    if type(hunk) ~= 'table' or type(hunk.added) ~= 'table' or type(hunk.vend) ~= 'number' then
+      log.eprintf('Malformed hunk during blame overlay: %s', vim.inspect(hunk))
+      return false
+    end
+
+    if hunk.added.count > 0 then
+      for curr_lnum = math.max(hunk.added.start, 1), hunk.vend do
+        blame[curr_lnum] = Blame.get_blame_nc(relpath, curr_lnum)
+      end
+    end
+  end
+
+  return true
+end
+
 --- @async
 --- @private
 --- @param lnum? integer|[integer, integer]
@@ -124,7 +147,10 @@ function CacheEntry:run_blame(lnum, opts)
   while true do
     local contents = send_contents and util.buf_lines(bufnr) or nil
     local tick = vim.b[bufnr].changedtick
-    local lnum0 = api.nvim_buf_line_count(bufnr) > BLAME_THRESHOLD_LEN and lnum or nil
+    local lnum0 = self.git_obj.repo.vcs ~= 'hg'
+        and api.nvim_buf_line_count(bufnr) > BLAME_THRESHOLD_LEN
+        and lnum
+      or nil
     -- TODO(lewis6991): Cancel blame on changedtick
     local blame, commits = self.git_obj:run_blame(contents, lnum0, self.git_obj.revision, opts)
     async.schedule()
@@ -194,7 +220,7 @@ function CacheEntry:get_blame(lnum, opts)
         end
       end
     end
-    if lnum and not has_blameable_line then
+    if lnum and not has_blameable_line and self.git_obj.repo.vcs ~= 'hg' then
       --- Bypass running blame (which can be expensive) if we know lnum is in a hunk
       local Blame = require('hgsigns.git.blame')
       local relpath = assert(self.git_obj.relpath)
@@ -208,6 +234,14 @@ function CacheEntry:get_blame(lnum, opts)
     else
       -- Refresh/update cache
       local b, commits, full = self:run_blame(lnum, opts)
+      if self.git_obj.repo.vcs == 'hg' then
+        local relpath = assert(self.git_obj.relpath)
+        if not overlay_hunk_blame(b, self.hunks, relpath) then
+          self.blame = nil
+          self.commits = nil
+          error('Malformed hunk data during mercurial blame overlay')
+        end
+      end
       self.commits = vim.tbl_extend('force', self.commits or {}, commits)
       if lnum and not full then
         local start_lnum = type(lnum) == 'table' and lnum[1] or lnum

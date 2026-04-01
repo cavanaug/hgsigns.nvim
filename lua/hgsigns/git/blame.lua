@@ -213,6 +213,180 @@ local function buffered_line_reader(f)
   end)
 end
 
+--- @param offset integer
+--- @return string
+local function hg_tz(offset)
+  local sign = offset <= 0 and '+' or '-'
+  offset = math.abs(offset)
+  local hours = math.floor(offset / 3600)
+  local minutes = math.floor((offset % 3600) / 60)
+  return ('%s%02d%02d'):format(sign, hours, minutes)
+end
+
+--- @param user string?
+--- @return string author
+--- @return string author_mail
+local function hg_user(user)
+  user = vim.trim(user or '')
+  local author, mail = user:match('^(.-)%s*<([^>]+)>$')
+  if author and mail then
+    author = vim.trim(author)
+    if author ~= '' then
+      return author, '<' .. mail .. '>'
+    end
+  end
+
+  return user ~= '' and user or 'unknown', '<unknown>'
+end
+
+--- @param filename string
+--- @param line table<string, any>
+--- @return string sha
+--- @return Hgsigns.CommitInfo
+local function parse_hg_commit(filename, line)
+  local sha = line.node
+  if type(sha) ~= 'string' or not sha:match('^%x+$') then
+    error(
+      ('Malformed hg annotate record for %s: missing node in %s'):format(
+        filename,
+        vim.inspect(line)
+      )
+    )
+  end
+
+  local date = line.date
+  if type(date) ~= 'table' then
+    error(
+      ('Malformed hg annotate record for %s: missing date in %s'):format(
+        filename,
+        vim.inspect(line)
+      )
+    )
+  end
+
+  local author_time = util.tointeger(date[1])
+  local offset = util.tointeger(date[2])
+  if not author_time or offset == nil then
+    error(
+      ('Malformed hg annotate record for %s: invalid date in %s'):format(
+        filename,
+        vim.inspect(line)
+      )
+    )
+  end
+
+  local author, author_mail = hg_user(line.user)
+  local summary = 'Version of ' .. filename
+
+  return sha,
+    {
+      sha = sha,
+      abbrev_sha = sha:sub(1, 12),
+      author = author,
+      author_mail = author_mail,
+      author_time = author_time,
+      author_tz = hg_tz(offset),
+      committer = author,
+      committer_mail = author_mail,
+      committer_time = author_time,
+      committer_tz = hg_tz(offset),
+      summary = summary,
+    }
+end
+
+--- @async
+--- @param obj Hgsigns.GitObj
+--- @param revision? string
+--- @param opts? Hgsigns.BlameOpts
+--- @return table<integer, Hgsigns.BlameInfo>
+--- @return table<string, Hgsigns.CommitInfo?>
+local function run_blame_hg(obj, revision, opts)
+  local ret = {} --- @type table<integer, Hgsigns.BlameInfo>
+  local commits = {} --- @type table<string,Hgsigns.CommitInfo?>
+
+  local stdout, stderr, code = obj.repo:command(
+    util.flatten({
+      'annotate',
+      '--user',
+      '--number',
+      '--changeset',
+      '--date',
+      '--line-number',
+      opts and opts.ignore_whitespace and '-w' or nil,
+      opts and opts.extra_opts or nil,
+      revision and { '--rev', revision } or nil,
+      '--template',
+      'json',
+      '--',
+      obj.relpath,
+    }),
+    {
+      ignore_error = true,
+    }
+  )
+
+  if code ~= 0 or stderr then
+    local msg = 'Error running hg annotate: ' .. (stderr or tostring(code))
+    error_once(msg)
+    log.eprint(msg)
+    error(msg)
+  end
+
+  local ok, decoded = pcall(vim.json.decode, table.concat(stdout, '\n'))
+  if not ok then
+    local msg = ('Failed to parse hg annotate JSON for %s: %s'):format(obj.relpath, decoded)
+    log.eprint(msg)
+    error(msg)
+  end
+
+  if type(decoded) ~= 'table' or type(decoded[1]) ~= 'table' then
+    error(('Malformed hg annotate JSON for %s: %s'):format(obj.relpath, vim.inspect(decoded)))
+  end
+
+  local blob = decoded[1]
+  local filename = blob.path
+  local lines = blob.lines
+
+  if type(filename) ~= 'string' or filename == '' then
+    error(('Malformed hg annotate JSON for %s: missing path'):format(obj.relpath))
+  end
+
+  if type(lines) ~= 'table' then
+    error(('Malformed hg annotate JSON for %s: missing lines'):format(obj.relpath))
+  end
+
+  for final_lnum, line in ipairs(lines) do
+    if type(line) ~= 'table' then
+      error(
+        ('Malformed hg annotate line %d for %s: %s'):format(final_lnum, filename, vim.inspect(line))
+      )
+    end
+
+    local sha, commit = parse_hg_commit(filename, line)
+    commits[sha] = commits[sha] or commit
+
+    local orig_lnum = util.tointeger(line.lineno)
+    if not orig_lnum then
+      error(
+        ('Malformed hg annotate line %d for %s: missing lineno in %s'):format(
+          final_lnum,
+          filename,
+          vim.inspect(line)
+        )
+      )
+    end
+
+    ret[final_lnum] = {
+      final_lnum = final_lnum,
+      orig_lnum = orig_lnum,
+      commit = commits[sha],
+      filename = filename,
+    }
+  end
+
+  return ret, commits
+end
+
 --- @async
 --- @param obj Hgsigns.GitObj
 --- @param contents? string[]
@@ -222,6 +396,25 @@ end
 --- @return table<integer, Hgsigns.BlameInfo>
 --- @return table<string, Hgsigns.CommitInfo?>
 function M.run_blame(obj, contents, lnum, revision, opts)
+  if obj.repo.vcs == 'hg' then
+    if not obj.object_name or obj.repo.abbrev_head == '' then
+      assert(contents, 'contents must be provided for untracked files')
+      local ret = {} --- @type table<integer,Hgsigns.BlameInfo>
+      local commit = not_committed(obj.file)
+      for i in ipairs(contents) do
+        ret[i] = {
+          orig_lnum = 0,
+          final_lnum = i,
+          commit = commit,
+          filename = obj.relpath or obj.file,
+        }
+      end
+      return ret, {}
+    end
+
+    return run_blame_hg(obj, revision, opts)
+  end
+
   local ret = {} --- @type table<integer,Hgsigns.BlameInfo>
 
   if not obj.object_name or obj.repo.abbrev_head == '' then

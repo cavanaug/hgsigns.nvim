@@ -114,6 +114,79 @@ describe('blame', function()
     eq('.config/nvim/lua/mappings.lua', args[#args])
   end)
 
+  it('parses mercurial annotate output with repo-relative nested paths', function()
+    local result = exec_lua(function()
+      local blame = require('hgsigns.git.blame')
+
+      local relpath = 'nested dir/file name.lua'
+      local encoded = vim.json.encode({
+        {
+          path = relpath,
+          lines = {
+            {
+              node = string.rep('a', 40),
+              rev = 12,
+              lineno = 1,
+              user = 'tester person',
+              date = { 1710000000, 0 },
+              line = 'first line\n',
+            },
+            {
+              node = string.rep('b', 40),
+              rev = 13,
+              lineno = 2,
+              user = 'reviewer person',
+              date = { 1710003600, 0 },
+              line = 'second line\n',
+            },
+          },
+        },
+      })
+
+      local captured_args
+      local obj = {
+        file = 'C:/repo/' .. relpath,
+        relpath = relpath,
+        object_name = string.rep('f', 40),
+        repo = {
+          vcs = 'hg',
+          abbrev_head = 'default',
+          toplevel = 'C:/repo',
+          command = function(_, argv, _)
+            captured_args = vim.deepcopy(argv)
+            return vim.split(encoded, '\n', { plain = true }), nil, 0
+          end,
+        },
+      }
+
+      local blame_entries, commits = blame.run_blame(obj, nil, nil, nil, {})
+      local blame_info = assert(blame_entries[2])
+
+      return {
+        argv = captured_args,
+        filename = blame_info.filename,
+        sha = blame_info.commit.sha,
+        abbrev_sha = blame_info.commit.abbrev_sha,
+        author = blame_info.commit.author,
+        author_time = blame_info.commit.author_time,
+        summary = blame_info.commit.summary,
+        commits = vim.tbl_count(commits),
+      }
+    end)
+
+    eq('annotate', result.argv[1])
+    eq(true, vim.tbl_contains(result.argv, '--template'))
+    eq(true, vim.tbl_contains(result.argv, 'json'))
+    eq('nested dir/file name.lua', result.argv[#result.argv])
+    eq('nested dir/file name.lua', result.filename)
+    eq(string.rep('b', 40), result.sha)
+    eq(string.rep('b', 12), result.abbrev_sha)
+    eq('reviewer person', result.author)
+    eq(1710003600, result.author_time)
+    eq('Version of nested dir/file name.lua', result.summary)
+    eq(2, result.commits)
+  end)
+
   it('blames a tracked file in a nested path', function()
     helpers.git_init_scratch()
 

@@ -397,6 +397,91 @@ describe('hgsigns (with screen)', function()
     it('does handle unix', function()
       blame_line_ui_test('false', 'unix')
     end)
+
+    it('shows committed and modified mercurial current-line blame truthfully', function()
+      setup_test_hg_repo()
+      edit(test_file)
+      wait_for_attach()
+
+      local committed = exec_lua(function()
+        return vim.wait(5000, function()
+          local info = vim.b.hgsigns_blame_line_dict
+          return info and info.author == 'tester' and info.filename == 'dummy.txt'
+        end)
+      end)
+      eq(true, committed)
+
+      local committed_info = exec_lua(function()
+        return vim.deepcopy(vim.b.hgsigns_blame_line_dict)
+      end)
+      eq('tester', committed_info.author)
+      eq('dummy.txt', committed_info.filename)
+      eq(false, committed_info.sha == '')
+
+      feed('ggccEDIT<esc>')
+
+      local modified = exec_lua(function()
+        return vim.wait(5000, function()
+          local info = vim.b.hgsigns_blame_line_dict
+          return info and info.author == 'Not Committed Yet'
+        end)
+      end)
+      eq(true, modified)
+
+      local modified_info = exec_lua(function()
+        return vim.deepcopy(vim.b.hgsigns_blame_line_dict)
+      end)
+      eq('Not Committed Yet', modified_info.author)
+      eq('dummy.txt', modified_info.filename)
+      eq(string.rep('0', 40), modified_info.sha)
+    end)
+
+    it('reuses mercurial annotate results across cursor movement', function()
+      setup_test_hg_repo({
+        test_file_text = { 'alpha', 'beta', 'gamma' },
+      })
+      edit(test_file)
+      wait_for_attach()
+
+      eq(
+        true,
+        exec_lua(function()
+          return vim.wait(5000, function()
+            local info = vim.b.hgsigns_blame_line_dict
+            return info and info.final_lnum == 1
+          end)
+        end)
+      )
+
+      exec_lua(function()
+        local bcache = assert(require('hgsigns.cache').cache[vim.api.nvim_get_current_buf()])
+        local original = bcache.run_blame
+        bcache._test_hg_blame_runs = 0
+        bcache.run_blame = function(self, ...)
+          self._test_hg_blame_runs = self._test_hg_blame_runs + 1
+          return original(self, ...)
+        end
+      end)
+
+      feed('j')
+
+      eq(
+        true,
+        exec_lua(function()
+          return vim.wait(5000, function()
+            local info = vim.b.hgsigns_blame_line_dict
+            return info and info.final_lnum == 2
+          end)
+        end)
+      )
+
+      local after_move_annotate_calls = exec_lua(function()
+        local bcache = assert(require('hgsigns.cache').cache[vim.api.nvim_get_current_buf()])
+        return bcache._test_hg_blame_runs
+      end)
+
+      eq(0, after_move_annotate_calls)
+    end)
   end)
 
   describe('falls back from right_align to eol when text is too long  (#1322)', function()

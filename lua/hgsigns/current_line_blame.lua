@@ -21,6 +21,7 @@ local function reset(bufnr)
   end
   api.nvim_buf_del_extmark(bufnr, namespace, 1)
   vim.b[bufnr].hgsigns_blame_line_dict = nil
+  vim.b[bufnr].hgsigns_blame_line = nil
 end
 
 --- @param fmt string
