@@ -269,6 +269,13 @@ require('hgsigns').setup{
 }
 ```
 
+> **Keymap note:** The example above uses `<leader>g*` mappings rather than the
+> `<leader>h*` mappings seen in the original gitsigns docs. This is intentional:
+> keeping the `g` prefix preserves muscle memory for anyone migrating from
+> gitsigns, and keeps VCS operations under a single namespace regardless of
+> whether the underlying VCS is Git or Mercurial. If you already have gitsigns
+> bindings, swapping `gitsigns` for `hgsigns` in your config is all that's needed.
+
 ## 🔗 Plugin Integrations
 
 ### [trouble.nvim]

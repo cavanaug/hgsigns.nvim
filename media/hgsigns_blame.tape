@@ -1,4 +1,5 @@
-# hgsigns_blame.tape — records current-line blame virtual text + blame window
+# hgsigns_blame.tape — current-line blame virtual text + blame window demo
+# Uses full LazyVim config (sonokai colorscheme, snacks statuscolumn, etc.)
 
 Output media/hgsigns_blame.gif
 
@@ -9,27 +10,33 @@ Set Shell "bash"
 Set FontSize 14
 Set Width 900
 Set Height 550
-Set Theme "Catppuccin Mocha"
+Set Theme { "background": "#2c2e34", "foreground": "#e2e2e3", "cursor": "#e2e2e3", "cursorAccent": "#2c2e34", "selection": "#3d3f4a" }
 Set TypingSpeed 80ms
 Set Padding 0
 
-# ── Setup: open blame demo file (hidden) ────────────────────────────────────
+# ── Setup: open blame demo file via full LazyVim config (hidden) ─────────────
 Hide
 Type "cd /home/cavanaug/wip_other/projects/hgsigns_v2/gitsigns.nvim/mercurial"
 Enter
-Type "nvim -u media/demo_init.lua media/demo_repos/blame/server.py"
+Type "find ~/.local/state/nvim/swap -name '*demo_repos*' -delete 2>/dev/null; true"
 Enter
-Sleep 2.5s
+Type "nvim --cmd 'set noswapfile' -c 'lua vim.diagnostic.config({virtual_text=false,signs=false})' media/demo_repos/blame/server.py"
+Enter
+Sleep 4s
+# Dismiss any startup prompts, then move to top
+Enter
+Sleep 300ms
 Type "gg"
-Sleep 1.5s
+Sleep 1s
+# Enable current line blame for this session
+Type ":Hgsigns toggle_current_line_blame"
+Enter
+Sleep 1s
 Show
 
-# ── Blame virtual text visible — move cursor down line by line ───────────────
+# ── Navigate lines — show blame virtual text updating per line ───────────────
 Sleep 1s
 
-# Scroll through lines to show different authors in the blame virtual text
-Type "j"
-Sleep 400ms
 Type "j"
 Sleep 400ms
 Type "j"
@@ -44,20 +51,22 @@ Type "j"
 Sleep 500ms
 Type "j"
 Sleep 500ms
+Type "j"
+Sleep 600ms
 Type "j"
 Sleep 600ms
 Type "j"
 Sleep 600ms
 
-# Show inline popup blame for current line
-Type " gb"
-Sleep 2s
+# Blame line popup  (<leader>ghb with space leader)
+Type " ghb"
+Sleep 2.5s
 
 # Close popup
 Escape
-Sleep 500ms
+Sleep 600ms
 
-# Jump further down
+# Jump further into the file
 Type "20G"
 Sleep 600ms
 Type "j"
@@ -67,10 +76,9 @@ Sleep 400ms
 Type "j"
 Sleep 400ms
 
-# Open the full blame window
-Type ":Hgsigns blame"
-Enter
-Sleep 2.5s
+# Open the full blame window  (<leader>ghB)
+Type " ghB"
+Sleep 3s
 
 # Navigate in blame window
 Type "j"
