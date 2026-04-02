@@ -3,6 +3,12 @@ doc/tags
 deps
 emydoc/
 .nvimlog
+scratch/
+scratch*/
+.tmp*/
+tmp.*/
+.bg-shell/
+
 
 # ── GSD baseline (auto-generated) ──
 .gsd
