@@ -305,8 +305,6 @@ describe('blame', function()
       })
 
       local calls = {}
-      local parent_calls = 0
-      local previous_path_calls = 0
       local obj = {
         file = 'C:/repo/' .. relpath,
         relpath = relpath,
@@ -315,24 +313,24 @@ describe('blame', function()
           vcs = 'hg',
           abbrev_head = 'default',
           toplevel = 'C:/repo',
-          get_parent_revision = function(_, sha)
-            parent_calls = parent_calls + 1
-            if sha == commit_sha then
-              return parent_sha
-            end
-          end,
-          get_previous_path = function(_, sha, path)
-            previous_path_calls = previous_path_calls + 1
-            if sha == commit_sha and path == relpath then
-              return 'file.txt'
-            end
-            return path
-          end,
           command = function(_, argv, _)
             calls[#calls + 1] = vim.deepcopy(argv)
 
             if argv[1] == 'annotate' then
               return vim.split(encoded, '\n', { plain = true }), nil, 0
+            end
+
+            if argv[1] == 'log' then
+              -- Return parent + copy info for both unique shas.
+              -- parent_sha has no parent (null hash); commit_sha's parent is parent_sha.
+              -- renamed.txt was added in commit_sha by renaming from file.txt.
+              local null_hash = string.rep('0', 40)
+              local lines = {
+                parent_sha .. ' ' .. null_hash,
+                commit_sha .. ' ' .. parent_sha,
+                'copy ' .. commit_sha .. ' ' .. relpath .. '\t' .. 'file.txt',
+              }
+              return lines, nil, 0
             end
 
             error('unexpected hg command: ' .. vim.inspect(argv))
@@ -348,8 +346,9 @@ describe('blame', function()
         first_has_previous = first.previous_sha ~= nil or first.previous_filename ~= nil,
         second_previous_sha = second.previous_sha,
         second_previous_filename = second.previous_filename,
-        parent_calls = parent_calls,
-        previous_path_calls = previous_path_calls,
+        log_calls = vim.tbl_count(vim.tbl_filter(function(argv)
+          return argv[1] == 'log'
+        end, calls)),
         annotate_calls = vim.tbl_count(vim.tbl_filter(function(argv)
           return argv[1] == 'annotate'
         end, calls)),
@@ -359,8 +358,7 @@ describe('blame', function()
     eq(false, result.first_has_previous)
     eq(string.rep('a', 40), result.second_previous_sha)
     eq('file.txt', result.second_previous_filename)
-    eq(2, result.parent_calls)
-    eq(1, result.previous_path_calls)
+    eq(1, result.log_calls)
     eq(1, result.annotate_calls)
   end)
 

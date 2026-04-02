@@ -355,11 +355,68 @@ local function run_blame_hg(obj, revision, opts)
     error(('Malformed hg annotate JSON for %s: missing lines'):format(obj.relpath))
   end
 
-  local parent_cache = {} --- @type table<string,string>
-  local parent_resolved = {} --- @type table<string,true>
-  local previous_path_cache = {} --- @type table<string,string>
-  local previous_path_resolved = {} --- @type table<string,true>
+  -- Collect unique non-null shas from the annotate output.
+  local NULL_SHA = string.rep('0', 40)
+  local unique_shas = {} --- @type table<string, true>
+  for _, line in ipairs(lines) do
+    if type(line.node) == 'string' and line.node ~= NULL_SHA then
+      unique_shas[line.node] = true
+    end
+  end
 
+  -- Batch-fetch parent and rename info for all unique shas in a single hg log
+  -- call, instead of one subprocess per changeset.
+  --
+  -- Output format (one or more lines per revision):
+  --   "{sha} {p1sha}"               — revision header (both are 40-char hex)
+  --   "{sha} copy {newname}\t{src}" — one line per copy/rename entry
+  --
+  -- \t is safe as the name/source separator: Mercurial forbids tabs in paths.
+  -- The "copy" prefix makes the two line types unambiguous in the parser.
+  local parent_map = {} --- @type table<string, string>   -- sha -> parent sha
+  local copies_map = {} --- @type table<string, string>   -- sha -> prev filename
+
+  local sha_list = vim.tbl_keys(unique_shas)
+  if #sha_list > 0 then
+    local revset = table.concat(sha_list, ' or ')
+
+    local log_out = obj.repo:command({
+      'log',
+      '-r',
+      revset,
+      '--copies',
+      '--template',
+      '{node} {p1node}{file_copies % "\ncopy {node} {name}\t{source}"}\n',
+    }, { ignore_error = true })
+
+    for _, ln in ipairs(log_out) do
+      if ln:sub(1, 4) == 'copy' then
+        -- copy entry: "copy {sha} {newname}\t{oldname}"
+        local sha_c = ln:sub(6, 45)
+        if sha_c:match('^%x+$') and ln:sub(46, 46) == ' ' then
+          local rest = ln:sub(47)
+          local tab = rest:find('\t', 1, true)
+          if tab then
+            local dst = rest:sub(1, tab - 1)
+            local src = rest:sub(tab + 1)
+            if dst == filename then
+              copies_map[sha_c] = src
+            end
+          end
+        end
+      else
+        -- revision header: "{sha} {p1sha}"
+        local sha_out = ln:sub(1, 40)
+        local p1 = ln:sub(42, 81)
+        if sha_out:match('^%x+$') and p1:match('^%x+$') and p1 ~= NULL_SHA then
+          parent_map[sha_out] = p1
+        end
+      end
+    end
+  end
+
+  -- Build the result table using the pre-fetched maps — O(1) subprocess calls
+  -- regardless of how many unique changesets the file has.
   for final_lnum, line in ipairs(lines) do
     if type(line) ~= 'table' then
       error(
@@ -381,33 +438,12 @@ local function run_blame_hg(obj, revision, opts)
       )
     end
 
-    local parent_key = sha
-    local parent_sha = parent_cache[parent_key] --- @type string?
-    if not parent_resolved[parent_key] then
-      parent_sha = obj.repo:get_parent_revision(sha)
-      if parent_sha then
-        parent_cache[parent_key] = parent_sha
-      end
-      parent_resolved[parent_key] = true
-    end
-
+    local parent_sha = parent_map[sha]
     local previous_sha --- @type string?
     local previous_filename --- @type string?
     if parent_sha then
-      local previous_key = sha .. '\0' .. filename
-      local previous_path = previous_path_cache[previous_key] --- @type string?
-      if not previous_path_resolved[previous_key] then
-        previous_path = obj.repo:get_previous_path(sha, filename)
-        if previous_path then
-          previous_path_cache[previous_key] = previous_path
-        end
-        previous_path_resolved[previous_key] = true
-      end
-
-      if previous_path then
-        previous_sha = parent_sha
-        previous_filename = previous_path
-      end
+      previous_sha = parent_sha
+      previous_filename = copies_map[sha] or filename
     end
 
     ret[final_lnum] = {
