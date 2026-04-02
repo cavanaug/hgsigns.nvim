@@ -285,7 +285,7 @@ change_base({base}, {global}, {callback})               *hgsigns.change_base()*
         {callback} (`(fun(err: string?))?`)
 
 blame({opts}, {callback})                                    *hgsigns.blame()*
-    Run git-blame on the current file and open the results
+    Run hg blame on the current file and open the results
     in a scroll-bound vertical split.
 
     Mappings:
@@ -608,7 +608,7 @@ watch_gitdir                                     *hgsigns-config-watch_gitdir*
     }`
 <
     When opening a file, a libuv watcher is placed on the respective
-    `.git` directory to detect when changes happen to use as a trigger to
+    `.hg` directory to detect when changes happen to use as a trigger to
     update signs.
 
     Fields: ~
@@ -616,7 +616,7 @@ watch_gitdir                                     *hgsigns-config-watch_gitdir*
           Whether the watcher is enabled.
 
       • `follow_files`:
-          If a file is moved with `git mv`, switch the buffer to the new location.
+          If a file is moved with `hg rename`, switch the buffer to the new location.
 
 sign_priority                                   *hgsigns-config-sign_priority*
     Type: `number`, Default: `6`
@@ -890,7 +890,7 @@ current_line_blame_formatter     *hgsigns-config-current_line_blame_formatter*
                        • `boundary`: true?
 
                      Note that the keys map onto the output of:
-                       `git blame --line-porcelain`
+                       `hg blame`
 
       Return: ~
         The result of this function is passed directly to the `opts.virt_text`
