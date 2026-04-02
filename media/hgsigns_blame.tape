@@ -50,7 +50,7 @@ Type "j"
 Sleep 600ms
 
 # Show inline popup blame for current line
-Type " hb"
+Type " gb"
 Sleep 2s
 
 # Close popup

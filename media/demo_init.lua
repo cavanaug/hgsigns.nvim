@@ -42,10 +42,10 @@ require('hgsigns').setup({
     local map = function(m, l, r) vim.keymap.set(m, l, r, { buffer = buf, silent = true }) end
     map('n', ']h', function() hs.nav_hunk('next') end)
     map('n', '[h', function() hs.nav_hunk('prev') end)
-    map('n', '<leader>hp', hs.preview_hunk)
-    map('n', '<leader>hi', hs.preview_hunk_inline)
-    map('n', '<leader>hr', hs.reset_hunk)
-    map('n', '<leader>hb', function() hs.blame_line({ full = true }) end)
-    map('n', '<leader>hB', hs.blame)
+    map('n', '<leader>gp', hs.preview_hunk)
+    map('n', '<leader>gi', hs.preview_hunk_inline)
+    map('n', '<leader>gr', hs.reset_hunk)
+    map('n', '<leader>gb', function() hs.blame_line({ full = true }) end)
+    map('n', '<leader>gB', hs.blame)
   end,
 })

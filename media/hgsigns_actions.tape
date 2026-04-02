@@ -35,7 +35,7 @@ Type "]h"
 Sleep 800ms
 
 # Preview hunk popup
-Type " hp"
+Type " gp"
 Sleep 1.5s
 
 # Close popup
@@ -47,7 +47,7 @@ Type "]h"
 Sleep 800ms
 
 # Preview inline
-Type " hi"
+Type " gi"
 Sleep 1.5s
 
 # Navigate to added section
@@ -57,7 +57,7 @@ Type "]h"
 Sleep 600ms
 
 # Reset a hunk (undo one change)
-Type " hr"
+Type " gr"
 Sleep 1s
 
 # Navigate back

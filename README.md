@@ -4,6 +4,15 @@
 [![Version](https://img.shields.io/github/v/release/lewis6991/hgsigns.nvim)](https://github.com/lewis6991/hgsigns.nvim/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+> **Fork notice:** This plugin is a fork of
+> [lewis6991/gitsigns.nvim](https://github.com/lewis6991/gitsigns.nvim), adapted
+> for Mercurial (hg) instead of Git. Roughly 95% of the work — the architecture,
+> sign rendering, blame UI, diff engine, watcher, and test suite — belongs to
+> [@lewis6991](https://github.com/lewis6991) and the gitsigns contributors. The
+> remaining ~5% is the hg-backend migration carried out by
+> [@cavanaug](https://github.com/cavanaug) with assistance from
+> [GSD2/Claude](https://github.com/cavanaug). If you find hgsigns useful, please
+> ⭐ the [upstream repo](https://github.com/lewis6991/gitsigns.nvim) too.
 
 Deep buffer integration for Mercurial
 
@@ -227,28 +236,28 @@ require('hgsigns').setup{
     end)
 
     -- Actions
-    map('n', '<leader>hr', hgsigns.reset_hunk)
+    map('n', '<leader>gr', hgsigns.reset_hunk)
 
-    map('v', '<leader>hr', function()
+    map('v', '<leader>gr', function()
       hgsigns.reset_hunk({ vim.fn.line('.'), vim.fn.line('v') })
     end)
 
-    map('n', '<leader>hR', hgsigns.reset_buffer)
-    map('n', '<leader>hp', hgsigns.preview_hunk)
-    map('n', '<leader>hi', hgsigns.preview_hunk_inline)
+    map('n', '<leader>gR', hgsigns.reset_buffer)
+    map('n', '<leader>gp', hgsigns.preview_hunk)
+    map('n', '<leader>gi', hgsigns.preview_hunk_inline)
 
-    map('n', '<leader>hb', function()
+    map('n', '<leader>gb', function()
       hgsigns.blame_line({ full = true })
     end)
 
-    map('n', '<leader>hd', hgsigns.diffthis)
+    map('n', '<leader>gd', hgsigns.diffthis)
 
-    map('n', '<leader>hD', function()
+    map('n', '<leader>gD', function()
       hgsigns.diffthis('~')
     end)
 
-    map('n', '<leader>hQ', function() hgsigns.setqflist('all') end)
-    map('n', '<leader>hq', hgsigns.setqflist)
+    map('n', '<leader>gQ', function() hgsigns.setqflist('all') end)
+    map('n', '<leader>gq', hgsigns.setqflist)
 
     -- Toggles
     map('n', '<leader>tb', hgsigns.toggle_current_line_blame)
