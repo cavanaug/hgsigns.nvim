@@ -1,6 +1,5 @@
 local async = require('hgsigns.async')
 local config = require('hgsigns.config').config
-local manager = require('hgsigns.manager')
 local message = require('hgsigns.message')
 local util = require('hgsigns.util')
 local Status = require('hgsigns.status')
@@ -56,30 +55,6 @@ local function bufread(bufnr, dbufnr, base, relpath)
 end
 
 --- @async
---- @param bufnr integer
---- @param dbufnr integer
---- @param base string?
-local function bufwrite(bufnr, dbufnr, base)
-  local bcache = assert(cache[bufnr])
-  local buftext = util.buf_lines(dbufnr)
-  base = util.norm_base(base, bcache.git_obj.repo.vcs)
-  bcache.git_obj:lock(function()
-    bcache.git_obj:stage_lines(buftext)
-  end)
-  async.schedule()
-  if not api.nvim_buf_is_valid(bufnr) then
-    return
-  end
-  vim.bo[dbufnr].modified = false
-  -- If diff buffer base matches the git_obj revision then also update the
-  -- signs.
-  if base == bcache.git_obj.revision then
-    bcache.compare_text = buftext
-    manager.update(bufnr)
-  end
-end
-
---- @async
 --- Create a hgsigns buffer for a certain revision of a file
 --- @param bufnr integer
 --- @param base string?
@@ -107,29 +82,8 @@ local function create_revision_buf(bufnr, base, relpath)
     return
   end
 
-  -- allow editing the index revision
-  if not base then
-    vim.bo[dbuf].buftype = 'acwrite'
-
-    api.nvim_create_autocmd('BufReadCmd', {
-      group = 'hgsigns',
-      buffer = dbuf,
-      callback = function()
-        async.run(bufread, bufnr, dbuf, base, relpath):raise_on_error()
-      end,
-    })
-
-    api.nvim_create_autocmd('BufWriteCmd', {
-      group = 'hgsigns',
-      buffer = dbuf,
-      callback = function()
-        async.run(bufwrite, bufnr, dbuf, base):raise_on_error()
-      end,
-    })
-  else
-    vim.bo[dbuf].buftype = 'nowrite'
-    vim.bo[dbuf].modifiable = false
-  end
+  vim.bo[dbuf].buftype = 'nowrite'
+  vim.bo[dbuf].modifiable = false
 
   return bufname, dbuf
 end

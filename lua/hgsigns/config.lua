@@ -264,7 +264,7 @@ M.schema = {
           end
 
           -- Setup keymaps
-          vim.api.nvim_buf_set_keymap(bufnr, 'n', 'hs', '<cmd>lua require"hgsigns".stage_hunk()<CR>', {})
+          vim.api.nvim_buf_set_keymap(bufnr, 'n', 'hr', '<cmd>lua require"hgsigns".reset_hunk()<CR>', {})
           ... -- More keymaps
         end
 <

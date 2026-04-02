@@ -13,7 +13,6 @@ local setup_test_repo = helpers.setup_test_repo
 local setup_test_hg_repo = helpers.setup_test_hg_repo
 local eq = helpers.eq
 local expectf = helpers.expectf
-local git = helpers.git
 local hg = helpers.hg
 local scratch = helpers.scratch
 local write_to_file = helpers.write_to_file
@@ -87,45 +86,6 @@ local function retry(f)
   end
 end
 
---- @param start integer
---- @param dend integer
---- @param lines string[]
-local function set_lines(start, dend, lines)
-  api.nvim_buf_set_lines(0, start, dend, false, lines)
-end
-
---- @param range [integer, integer]?
-local function stage_hunk(range)
-  exec_lua(function(range0)
-    local async = require('hgsigns.async')
-
-    if range0 == vim.NIL then
-      range0 = nil
-    end
-
-    async
-      .run(function()
-        local err = async.await(1, function(cb)
-          require('hgsigns').stage_hunk(range0, nil, cb)
-        end)
-        assert(not err, err)
-      end)
-      :wait(1000)
-  end, range == nil and vim.NIL or range)
-end
-
-local function reset_buffer_index()
-  exec_lua(function()
-    local async = require('hgsigns.async')
-    async
-      .run(function()
-        local err = async.await(1, require('hgsigns').reset_buffer_index)
-        assert(not err, err)
-      end)
-      :wait(1000)
-  end)
-end
-
 describe('actions', function()
   local orig_it = it
   local function it(desc, f)
@@ -138,67 +98,6 @@ describe('actions', function()
     clear()
     helpers.chdir_tmp()
     setup_hgsigns(test_config)
-  end)
-
-  it('works with commands', function()
-    setup_test_repo()
-    edit(test_file)
-
-    feed('jjjccEDIT<esc>')
-    check({
-      status = { head = 'main', added = 0, changed = 1, removed = 0 },
-      signs = { changed = 1 },
-    })
-
-    command('Hgsigns stage_hunk')
-    check({
-      status = { head = 'main', added = 0, changed = 0, removed = 0 },
-      signs = {},
-    })
-
-    command('Hgsigns undo_stage_hunk')
-    check({
-      status = { head = 'main', added = 0, changed = 1, removed = 0 },
-      signs = { changed = 1 },
-    })
-
-    command('Hgsigns stage_hunk')
-    check({
-      status = { head = 'main', added = 0, changed = 0, removed = 0 },
-      signs = {},
-    })
-
-    command('Hgsigns stage_hunk')
-    check({
-      status = { head = 'main', added = 0, changed = 1, removed = 0 },
-      signs = { changed = 1 },
-    })
-
-    -- Add multiple edits
-    feed('ggccThat<esc>')
-
-    check({
-      status = { head = 'main', added = 0, changed = 2, removed = 0 },
-      signs = { changed = 2 },
-    })
-
-    command('Hgsigns stage_buffer')
-    check({
-      status = { head = 'main', added = 0, changed = 0, removed = 0 },
-      signs = {},
-    })
-
-    command('Hgsigns reset_buffer_index')
-    check({
-      status = { head = 'main', added = 0, changed = 2, removed = 0 },
-      signs = { changed = 2 },
-    })
-
-    command('Hgsigns reset_hunk')
-    check({
-      status = { head = 'main', added = 0, changed = 1, removed = 0 },
-      signs = { changed = 1 },
-    })
   end)
 
   it('show_commit does not include ansi color codes', function()
@@ -345,58 +244,7 @@ describe('actions', function()
     end
   )
 
-  it('does not emit duplicate HgsignsUpdate events for stage_hunk', function()
-    setup_test_repo()
-    edit(test_file)
-
-    feed('jjjccEDIT<esc>')
-    check({
-      status = { head = 'main', added = 0, changed = 1, removed = 0 },
-      signs = { changed = 1 },
-    })
-
-    exec_lua(function()
-      _G.test_hgsigns_update_events = {}
-
-      vim.api.nvim_create_autocmd('User', {
-        group = vim.api.nvim_create_augroup('HgsignsUpdateTest', { clear = true }),
-        pattern = 'HgsignsUpdate',
-        callback = function(args)
-          local bufnr = args.data and args.data.buffer
-          if bufnr ~= vim.api.nvim_get_current_buf() then
-            return
-          end
-
-          local status = vim.b[bufnr].hgsigns_status_dict
-          _G.test_hgsigns_update_events[#_G.test_hgsigns_update_events + 1] = {
-            added = status and status.added,
-            changed = status and status.changed,
-            removed = status and status.removed,
-            head = status and status.head,
-          }
-        end,
-      })
-    end)
-
-    command('Hgsigns stage_hunk')
-    check({
-      status = { head = 'main', added = 0, changed = 0, removed = 0 },
-      signs = {},
-    })
-
-    helpers.sleep(500)
-
-    eq({
-      {
-        added = 0,
-        changed = 0,
-        removed = 0,
-        head = 'main',
-      },
-    }, exec_lua('return _G.test_hgsigns_update_events'))
-  end)
-
-  it('preserves foldenable in diffthis windows after staging a hunk', function()
+  it('preserves foldenable in diffthis windows after a hunk reset', function()
     command('silent! %bwipe!')
     setup_test_repo()
     edit(test_file)
@@ -431,7 +279,7 @@ describe('actions', function()
 
     api.nvim_set_option_value('foldenable', false, { scope = 'local', win = rev_win })
 
-    stage_hunk()
+    command('Hgsigns reset_hunk')
 
     check({
       status = { head = 'main', added = 0, changed = 0, removed = 0 },
@@ -441,130 +289,6 @@ describe('actions', function()
     expectf(function()
       eq(true, api.nvim_win_is_valid(rev_win))
       eq(false, api.nvim_get_option_value('foldenable', { scope = 'local', win = rev_win }))
-    end)
-  end)
-
-  describe('staging partial hunks', function()
-    setup(function()
-      clear()
-      setup_test_repo({ test_file_text = { 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H' } })
-    end)
-
-    before_each(function()
-      helpers.git('reset', '--hard')
-      edit(test_file)
-      check({
-        status = { head = 'main', added = 0, changed = 0, removed = 0 },
-        signs = {},
-      })
-    end)
-    describe('can stage add hunks', function()
-      before_each(function()
-        set_lines(2, 2, { 'c1', 'c2', 'c3', 'c4' })
-        expect_hunks({ '@@ -2 +3,4 @@' })
-      end)
-
-      it('contained in range', function()
-        stage_hunk({ 1, 7 })
-        expect_hunks({})
-      end)
-
-      it('containing range', function()
-        stage_hunk({ 4, 5 })
-        expect_hunks({
-          '@@ -2 +3,1 @@',
-          '@@ -4 +6,1 @@',
-        })
-      end)
-
-      it('from top range', function()
-        stage_hunk({ 1, 4 })
-        expect_hunks({ '@@ -4 +5,2 @@' })
-      end)
-
-      it('from bottom range', function()
-        stage_hunk({ 4, 7 })
-        expect_hunks({ '@@ -2 +3,1 @@' })
-
-        reset_buffer_index()
-        expect_hunks({ '@@ -2 +3,4 @@' })
-
-        stage_hunk({ 4, 10 })
-        expect_hunks({ '@@ -2 +3,1 @@' })
-      end)
-    end)
-
-    describe('can stage modified-add hunks', function()
-      before_each(function()
-        set_lines(2, 4, { 'c1', 'c2', 'c3', 'c4', 'c5' })
-        expect_hunks({ '@@ -3,2 +3,5 @@' })
-      end)
-
-      it('from top range containing mod', function()
-        stage_hunk({ 2, 3 })
-        expect_hunks({ '@@ -4,1 +4,4 @@' })
-      end)
-
-      it('from top range containing mod-add', function()
-        stage_hunk({ 2, 5 })
-        expect_hunks({ '@@ -5 +6,2 @@' })
-      end)
-
-      it('from bottom range containing add', function()
-        stage_hunk({ 6, 8 })
-        expect_hunks({ '@@ -3,2 +3,3 @@' })
-      end)
-
-      it('containing range containing add', function()
-        command('write')
-        stage_hunk({ 5, 6 })
-        expect_hunks({
-          '@@ -3,2 +3,2 @@',
-          '@@ -6 +7,1 @@',
-        })
-      end)
-    end)
-
-    describe('can stage modified-remove hunks', function()
-      before_each(function()
-        set_lines(2, 7, { 'c1', 'c2', 'c3' })
-        command('write')
-        expect_hunks({ '@@ -3,5 +3,3 @@' })
-      end)
-
-      it('from top range', function()
-        expect_hunks({ '@@ -3,5 +3,3 @@' })
-
-        stage_hunk({ 2, 3 })
-        expect_hunks({ '@@ -4,4 +4,2 @@' })
-
-        reset_buffer_index()
-        expect_hunks({ '@@ -3,5 +3,3 @@' })
-
-        stage_hunk({ 2, 4 })
-        expect_hunks({ '@@ -5,3 +5,1 @@' })
-      end)
-
-      it('from bottom range', function()
-        expect_hunks({ '@@ -3,5 +3,3 @@' })
-
-        stage_hunk({ 4, 6 })
-        expect_hunks({ '@@ -3,1 +3,1 @@' })
-
-        reset_buffer_index()
-        expect_hunks({ '@@ -3,5 +3,3 @@' })
-
-        stage_hunk({ 5, 6 })
-        expect_hunks({ '@@ -3,2 +3,2 @@' })
-      end)
-    end)
-
-    it('can stage remove hunks', function()
-      set_lines(2, 5, {})
-      expect_hunks({ '@@ -3,3 +2 @@' })
-
-      stage_hunk({ 2, 2 })
-      expect_hunks({})
     end)
   end)
 
@@ -633,62 +357,5 @@ describe('actions', function()
     check_cursor({ 4, 0 })
     command('Hgsigns prev_hunk')
     check_cursor({ 4, 0 })
-  end)
-
-  it('can stage hunks with no NL at EOF', function()
-    setup_test_repo()
-    local newfile = helpers.newfile
-    exec_lua([[vim.g.editorconfig = false]])
-    helpers.write_to_file(newfile, { 'This is a file with no nl at eof' }, {
-      trailing_newline = false,
-    })
-    helpers.git('add', newfile)
-    helpers.git('commit', '-m', 'commit on main')
-
-    edit(newfile)
-    check({ status = { head = 'main', added = 0, changed = 0, removed = 0 } })
-    feed('x')
-    check({ status = { head = 'main', added = 0, changed = 1, removed = 0 } })
-    command('Hgsigns stage_hunk')
-    check({ status = { head = 'main', added = 0, changed = 0, removed = 0 } })
-  end)
-
-  it('stages tracked changes after attach in a nested path', function()
-    helpers.git_init_scratch()
-
-    local relpath = 'sub/stage.txt'
-    local file = scratch .. '/' .. relpath
-
-    write_to_file(file, { 'hello', 'world' })
-    git('add', file)
-    git('commit', '-m', 'add nested file')
-
-    edit(file)
-
-    expectf(function()
-      return exec_lua(function()
-        return vim.b.hgsigns_status_dict.gitdir ~= nil
-      end)
-    end)
-
-    set_lines(0, 1, { 'changed' })
-
-    expectf(function()
-      local hunks = exec_lua(function(bufnr)
-        local cache = assert(require('hgsigns.cache').cache[bufnr])
-        return cache.hunks and #cache.hunks or 0
-      end, api.nvim_get_current_buf())
-
-      return hunks > 0
-    end)
-
-    stage_hunk()
-
-    expectf(function()
-      eq(
-        relpath,
-        vim.trim(helpers.fn.system({ 'git', '-C', scratch, 'diff', '--cached', '--name-only' }))
-      )
-    end)
   end)
 end)

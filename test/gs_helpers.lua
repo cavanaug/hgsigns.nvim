@@ -367,26 +367,6 @@ function M.expectf(cond, interval)
   cond()
 end
 
---- @param range [integer, integer]?
-function M.stage_hunk(range)
-  M.exec_lua(function(range0)
-    local async = require('hgsigns.async')
-
-    if range0 == vim.NIL then
-      range0 = nil
-    end
-
-    async
-      .run(function()
-        local err = async.await(1, function(cb)
-          require('hgsigns').stage_hunk(range0, nil, cb)
-        end)
-        assert(not err, err)
-      end)
-      :wait(5000)
-  end, range == nil and vim.NIL or range)
-end
-
 --- @param path string
 function M.edit(path)
   helpers.api.nvim_command('edit ' .. M.fn.fnameescape(path))

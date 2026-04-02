@@ -1,5 +1,4 @@
 local log = require('hgsigns.debug.log')
-local async = require('hgsigns.async')
 local util = require('hgsigns.util')
 local Repo = require('hgsigns.git.repo')
 local errors = require('hgsigns.git.errors')
@@ -11,8 +10,6 @@ M.Repo = Repo
 --- @class Hgsigns.GitObj
 --- @field file string
 --- @field encoding string
---- @field i_crlf? boolean Object has crlf
---- @field w_crlf? boolean Working copy has crlf
 --- @field mode_bits string
 --- @field file_state? Hgsigns.FileState
 ---
@@ -70,8 +67,6 @@ function Obj:refresh()
   self.mode_bits = info.mode_bits
   self.file_state = info.file_state
   self.has_conflicts = info.has_conflicts
-  self.i_crlf = info.i_crlf
-  self.w_crlf = info.w_crlf
 
   log.dprintf(
     'Refreshed %s: state=%s relpath=%s object_name=%s',
@@ -126,32 +121,7 @@ function Obj:get_show_text(revision, relpath)
     stdout, stderr = self.repo:get_show_text(assert(self.object_name), self.encoding)
   end
 
-  if not self.i_crlf and self.w_crlf then
-    -- Add cr
-    -- Do not add cr to the newline at the end of file
-    for i = 1, #stdout - 1 do
-      stdout[i] = stdout[i] .. '\r'
-    end
-  end
-
   return stdout, stderr
-end
-
---- @param file string
-local function autocmd_changed(file)
-  vim.schedule(function()
-    vim.api.nvim_exec_autocmds('User', {
-      pattern = 'HgsignsChanged',
-      modeline = false,
-      data = { file = file },
-    })
-  end)
-end
-
---- @async
-function Obj:unstage_file()
-  self.repo:command({ 'reset', self.file })
-  autocmd_changed(self.file)
 end
 
 --- @async
@@ -163,79 +133,6 @@ end
 --- @return table<string,Hgsigns.CommitInfo?>
 function Obj:run_blame(contents, lnum, revision, opts)
   return require('hgsigns.git.blame').run_blame(self, contents, lnum, revision, opts)
-end
-
---- @async
---- @private
-function Obj:ensure_file_in_index()
-  if self.object_name and not self.has_conflicts then
-    return
-  end
-
-  if not self.object_name then
-    -- If there is no object_name then it is not yet in the index so add it
-    self.repo:command({ 'add', '--intent-to-add', self.file })
-  else
-    -- Update the index with the common ancestor (stage 1) which is what bcache
-    -- stores
-    self.repo:update_index(self.mode_bits, self.object_name, assert(self.relpath), true)
-  end
-
-  self:refresh()
-end
-
---- @async
---- Stage 'lines' as the entire contents of the file
---- @param lines string[]
-function Obj:stage_lines(lines)
-  local relpath = assert(self.relpath)
-  local new_object = self.repo:hash_object(relpath, lines)
-  self.repo:update_index(self.mode_bits, new_object, relpath)
-  autocmd_changed(self.file)
-end
-
-local sleep = async.wrap(2, function(duration, cb)
-  vim.defer_fn(cb, duration)
-end)
-
---- @async
---- @param hunks Hgsigns.Hunk.Hunk[]
---- @param invert? boolean
---- @return string? err
-function Obj:stage_hunks(hunks, invert)
-  self:ensure_file_in_index()
-
-  local relpath = assert(self.relpath)
-  local patch = require('hgsigns.hunks').create_patch(relpath, hunks, self.mode_bits, invert)
-
-  if not self.i_crlf and self.w_crlf then
-    -- Remove cr
-    for i, p in ipairs(patch) do
-      patch[i] = p:gsub('\r$', '')
-    end
-  end
-
-  local stat, err = pcall(function()
-    self.repo:command({
-      'apply',
-      '--whitespace=nowarn',
-      '--cached',
-      '--unidiff-zero',
-      '-',
-    }, {
-      stdin = patch,
-    })
-  end)
-
-  if not stat then
-    return err
-  end
-
-  -- Staging operations cause IO of the git directory so wait some time
-  -- for the changes to settle.
-  sleep(100)
-
-  autocmd_changed(self.file)
 end
 
 --- @async
@@ -307,8 +204,6 @@ function Obj.new(file, revision, encoding, gitdir, toplevel)
   self.mode_bits = info.mode_bits
   self.file_state = info.file_state
   self.has_conflicts = info.has_conflicts
-  self.i_crlf = info.i_crlf
-  self.w_crlf = info.w_crlf
 
   return self
 end

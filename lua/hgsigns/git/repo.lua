@@ -1073,8 +1073,6 @@ end
 --- @field mode_bits? string
 --- @field object_name? string nil if file has no parent object baseline
 --- @field file_state? Hgsigns.FileState
---- @field i_crlf? boolean (requires git version >= 2.9)
---- @field w_crlf? boolean (requires git version >= 2.9)
 --- @field has_conflicts? true
 
 --- @async
@@ -1091,8 +1089,6 @@ function M:ls_files(file)
     return self:hg_file_info(relpath)
   end
 
-  local has_eol = check_version(2, 9)
-
   -- --others + --exclude-standard means ignored files won't return info, but
   -- untracked files will. Unlike file_info_tree which won't return untracked
   -- files.
@@ -1102,7 +1098,6 @@ function M:ls_files(file)
       '--stage',
       '--others',
       '--exclude-standard',
-      has_eol and '--eol',
       file,
     }),
     { ignore_error = true }
@@ -1114,16 +1109,14 @@ function M:ls_files(file)
     return nil, stderr or tostring(code)
   end
 
-  local relpath_idx = has_eol and 2 or 1
-
   local result = {
     file_state = 'unknown',
   } --- @type Hgsigns.Repo.LsFiles.Result
   for _, line in ipairs(results) do
     local parts = vim.split(line, '\t')
-    if #parts > relpath_idx then -- tracked file
+    if #parts > 1 then -- tracked file
       result.file_state = 'tracked'
-      local attrs = vim.split(assert(parts[1]), '%s+')
+      local attrs = vim.split(parts[1], '%s+')
       local stage = tonumber(attrs[3])
       if stage <= 1 then
         result.mode_bits = attrs[1]
@@ -1131,17 +1124,9 @@ function M:ls_files(file)
       else
         result.has_conflicts = true
       end
-
-      if has_eol then
-        result.relpath = parts[3]
-        local eol = vim.split(assert(parts[2]), '%s+')
-        result.i_crlf = eol[1] == 'i/crlf'
-        result.w_crlf = eol[2] == 'w/crlf'
-      else
-        result.relpath = parts[2]
-      end
+      result.relpath = parts[2]
     else -- untracked file
-      result.relpath = parts[relpath_idx]
+      result.relpath = parts[1]
       result.file_state = 'unknown'
     end
   end
@@ -1208,32 +1193,6 @@ function M:file_info(file, revision)
 
     return info
   end
-end
-
---- @async
---- @param mode_bits string
---- @param object string
---- @param path string
---- @param add? boolean
-function M:update_index(mode_bits, object, path, add)
-  self:command(util.flatten({
-    'update-index',
-    add and '--add',
-    '--cacheinfo',
-    ('%s,%s,%s'):format(mode_bits, object, path),
-  }))
-end
-
---- @async
---- @param path string
---- @param lines string[]
---- @return string
-function M:hash_object(path, lines)
-  -- Concatenate the lines into a single string to ensure EOL
-  -- is respected
-  local text = table.concat(lines, '\n')
-  local res = self:command({ 'hash-object', '-w', '--path', path, '--stdin' }, { stdin = text })[1]
-  return assert(res)
 end
 
 --- @param line string?
