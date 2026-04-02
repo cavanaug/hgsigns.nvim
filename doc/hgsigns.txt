@@ -9,16 +9,16 @@ License:  MIT license
 ==============================================================================
 INTRODUCTION                                                        *hgsigns*
 
-Hgsigns is a plugin for Neovim that provides integration with Git via a
+Hgsigns is a plugin for Neovim that provides integration with Mercurial via a
 feature set which includes (but not limited to):
   • Provides signs in the |signcolumn| to show changed/added/removed lines.
-  • Mappings to operate on hunks to stage, undo or reset against Git's index.
+  • Mappings to operate on hunks to undo or reset against the working copy.
 
 Hgsigns is implemented entirely in Lua which is built into Neovim and
-requires no external dependencies other than git. This is unlike other plugins
+requires no external dependencies other than hg. This is unlike other plugins
 that require python, node, etc, which need to communicate with Neovim using
 |RPC|.  By default, Hgsigns also uses Neovim's built-in diff library
-(`vim.diff`) unlike other similar plugins that need to run `git-diff` as an
+(`vim.diff`) unlike other similar plugins that need to run `hg diff` as an
 external process which is less efficient, has tighter bottlenecks and requires
 file IO.
 
@@ -39,15 +39,6 @@ with most of the default settings:
         changedelete = { text = '~' },
         untracked    = { text = '┆' },
       },
-      signs_staged = {
-        add          = { text = '┃' },
-        change       = { text = '┃' },
-        delete       = { text = '_' },
-        topdelete    = { text = '‾' },
-        changedelete = { text = '~' },
-        untracked    = { text = '┆' },
-      },
-      signs_staged_enable = true,
       signcolumn = true,  -- Toggle with `:Hgsigns toggle_signs`
       numhl      = false, -- Toggle with `:Hgsigns toggle_numhl`
       linehl     = false, -- Toggle with `:Hgsigns toggle_linehl`
@@ -436,43 +427,7 @@ nav_hunk({direction}, {opts}, {callback})                  *hgsigns.nav_hunk()*
                       hunk.
                     • {count}: (`integer`)
                       Number of times to advance. Defaults to |v:count1|.
-                    • {target}: (`("unstaged"|"staged"|"all")`)
-                      Which kinds of hunks to target. Defaults to `'unstaged'`.
         {callback}  (`(fun(err: string?))?`)
-
-reset_buffer_index({callback})                  *hgsigns.reset_buffer_index()*
-    Unstage all hunks for current buffer in the index. Note:
-    Unlike |hgsigns.undo_stage_hunk()| this doesn't simply undo
-    stages, this runs an `git reset` on current buffers file.
-
-    Attributes: ~
-        {async}
-
-    Parameters: ~
-        {callback} (`(fun(err: string?))?`)
-
-stage_buffer({callback})                              *hgsigns.stage_buffer()*
-    Stage all hunks in current buffer.
-
-    Attributes: ~
-        {async}
-
-    Parameters: ~
-        {callback} (`(fun(err: string?))?`)
-
-undo_stage_hunk({callback})                        *hgsigns.undo_stage_hunk()*
-    DEPRECATED: use |hgsigns.stage_hunk()| on staged signs
-
-    Undo the last call of stage_hunk().
-
-    Note: only the calls to stage_hunk() performed in the current
-    session can be undone.
-
-    Attributes: ~
-        {async}
-
-    Parameters: ~
-        {callback} (`(fun(err: string?))?`)
 
 reset_buffer()                                        *hgsigns.reset_buffer()*
     Reset the lines of all hunks in the buffer.
@@ -488,28 +443,6 @@ reset_hunk({range}, {opts}, {callback})                 *hgsigns.reset_hunk()*
         {range}    (`(integer,integer)?`): List-like table of two integers
                                            making
                    up the line range from which you want to reset the hunks.
-                   If running via command line, then this is taken from the
-                   command modifiers.
-        {opts}     (`Hgsigns.HunkOpts?`): Additional options.
-                   • {greedy}: (`boolean?`)
-                     Operate on/select all contiguous hunks. Only useful if
-                     'diff_opts' contains `linematch`. Defaults to `true`.
-        {callback} (`(fun(err: string?))?`)
-
-stage_hunk({range}, {opts}, {callback})                 *hgsigns.stage_hunk()*
-    Stage the hunk at the cursor position, or all lines in the
-    given range. If {range} is provided, all lines in the given
-    range are staged. This supports partial-hunks, meaning if a
-    range only includes a portion of a particular hunk, only the
-    lines within the range will be staged.
-
-    Attributes: ~
-        {async}
-
-    Parameters: ~
-        {range}    (`(integer,integer)?`): List-like table of two integers
-                                           making
-                   up the line range from which you want to stage the hunks.
                    If running via command line, then this is taken from the
                    command modifiers.
         {opts}     (`Hgsigns.HunkOpts?`): Additional options.
@@ -645,46 +578,6 @@ signs                                                   *hgsigns-config-signs*
 
     See |hgsigns-highlight-groups|.
 
-signs_staged                                     *hgsigns-config-signs_staged*
-    Type: `table[extended]`
-    Default: >
-    {
-      add          = { text = '┃' },
-      change       = { text = '┃' },
-      delete       = { text = '▁' },
-      topdelete    = { text = '▔' },
-      changedelete = { text = '~' },
-    }
-<
-    Configuration for signs of staged hunks.
-
-    See |hgsigns-config-signs|.
-
-signs_staged_enable                       *hgsigns-config-signs_staged_enable*
-    Type: `boolean`, Default: `true`
-
-    Show signs for staged hunks.
-
-    When enabled the signs defined in |git-config-signs_staged| are used.
-
-worktrees                                           *hgsigns-config-worktrees*
-    Type: `table`, Default: `{}`
-
-    Detached working trees.
-
-    Array of tables with the keys `gitdir` and `toplevel`.
-
-    If normal attaching fails, then each entry in the table is attempted
-    with the work tree details set.
-
-    Example: >lua
-      worktrees = {
-        {
-          toplevel = vim.env.HOME,
-          gitdir = vim.env.HOME .. '/projects/dotfiles/.git'
-        }
-      }
-
 on_attach                                           *hgsigns-config-on_attach*
     Type: `function`, Default: `nil`
 
@@ -701,7 +594,7 @@ on_attach                                           *hgsigns-config-on_attach*
         end
 
         -- Setup keymaps
-        vim.api.nvim_buf_set_keymap(bufnr, 'n', 'hs', '<cmd>lua require"hgsigns".stage_hunk()<CR>', {})
+        vim.api.nvim_buf_set_keymap(bufnr, 'n', 'hr', '<cmd>lua require"hgsigns".reset_hunk()<CR>', {})
         ... -- More keymaps
       end
 <
@@ -1018,12 +911,6 @@ trouble                                               *hgsigns-config-trouble*
     When using setqflist() or setloclist(), open Trouble instead of the
     quickfix/location list window.
 
-gh                                                         *hgsigns-config-gh*
-    Type: `boolean`, Default: `false`
-
-    Enable GitHub integration. This allows the following features:
-    • `:Hgsigns blame_line` will show PR numbers (with a hyperlink)
-
 word_diff                                           *hgsigns-config-word_diff*
     Type: `boolean`, Default: `false`
 
@@ -1173,121 +1060,6 @@ HgsignsUntrackedCul
     Used for the text (when the cursor is on the same line as the sign) of 'untracked' signs.
 
     Fallbacks: `HgsignsAddCul`
-                                                        *hl-HgsignsStagedAdd*
-HgsignsStagedAdd
-    Used for the text of 'add' staged signs.
-
-    Fallbacks: `HgsignsAdd` (fg=50%)
-                                                        *hl-HgsignsStagedChange*
-HgsignsStagedChange
-    Used for the text of 'change' staged signs.
-
-    Fallbacks: `HgsignsChange` (fg=50%)
-                                                        *hl-HgsignsStagedDelete*
-HgsignsStagedDelete
-    Used for the text of 'delete' staged signs.
-
-    Fallbacks: `HgsignsDelete` (fg=50%)
-                                                        *hl-HgsignsStagedChangedelete*
-HgsignsStagedChangedelete
-    Used for the text of 'changedelete' staged signs.
-
-    Fallbacks: `HgsignsChangedelete` (fg=50%)
-                                                        *hl-HgsignsStagedTopdelete*
-HgsignsStagedTopdelete
-    Used for the text of 'topdelete' staged signs.
-
-    Fallbacks: `HgsignsTopdelete` (fg=50%)
-                                                        *hl-HgsignsStagedUntracked*
-HgsignsStagedUntracked
-    Used for the text of 'untracked' staged signs.
-
-    Fallbacks: `HgsignsUntracked` (fg=50%)
-                                                        *hl-HgsignsStagedAddNr*
-HgsignsStagedAddNr
-    Used for number column (when `config.numhl == true`) of 'add' staged signs.
-
-    Fallbacks: `HgsignsAddNr` (fg=50%)
-                                                        *hl-HgsignsStagedChangeNr*
-HgsignsStagedChangeNr
-    Used for number column (when `config.numhl == true`) of 'change' staged signs.
-
-    Fallbacks: `HgsignsChangeNr` (fg=50%)
-                                                        *hl-HgsignsStagedDeleteNr*
-HgsignsStagedDeleteNr
-    Used for number column (when `config.numhl == true`) of 'delete' staged signs.
-
-    Fallbacks: `HgsignsDeleteNr` (fg=50%)
-                                                        *hl-HgsignsStagedChangedeleteNr*
-HgsignsStagedChangedeleteNr
-    Used for number column (when `config.numhl == true`) of 'changedelete' staged signs.
-
-    Fallbacks: `HgsignsChangedeleteNr` (fg=50%)
-                                                        *hl-HgsignsStagedTopdeleteNr*
-HgsignsStagedTopdeleteNr
-    Used for number column (when `config.numhl == true`) of 'topdelete' staged signs.
-
-    Fallbacks: `HgsignsTopdeleteNr` (fg=50%)
-                                                        *hl-HgsignsStagedUntrackedNr*
-HgsignsStagedUntrackedNr
-    Used for number column (when `config.numhl == true`) of 'untracked' staged signs.
-
-    Fallbacks: `HgsignsUntrackedNr` (fg=50%)
-                                                        *hl-HgsignsStagedAddLn*
-HgsignsStagedAddLn
-    Used for buffer line (when `config.linehl == true`) of 'add' staged signs.
-
-    Fallbacks: `HgsignsAddLn` (fg=50%)
-                                                        *hl-HgsignsStagedChangeLn*
-HgsignsStagedChangeLn
-    Used for buffer line (when `config.linehl == true`) of 'change' staged signs.
-
-    Fallbacks: `HgsignsChangeLn` (fg=50%)
-                                                        *hl-HgsignsStagedChangedeleteLn*
-HgsignsStagedChangedeleteLn
-    Used for buffer line (when `config.linehl == true`) of 'changedelete' staged signs.
-
-    Fallbacks: `HgsignsChangedeleteLn` (fg=50%)
-                                                        *hl-HgsignsStagedTopdeleteLn*
-HgsignsStagedTopdeleteLn
-    Used for buffer line (when `config.linehl == true`) of 'topdelete' staged signs.
-
-    Fallbacks: `HgsignsTopdeleteLn` (fg=50%)
-                                                        *hl-HgsignsStagedUntrackedLn*
-HgsignsStagedUntrackedLn
-    Used for buffer line (when `config.linehl == true`) of 'untracked' staged signs.
-
-    Fallbacks: `HgsignsUntrackedLn` (fg=50%)
-                                                        *hl-HgsignsStagedAddCul*
-HgsignsStagedAddCul
-    Used for the text (when the cursor is on the same line as the sign) of 'add' staged signs.
-
-    Fallbacks: `HgsignsAddCul` (fg=50%)
-                                                        *hl-HgsignsStagedChangeCul*
-HgsignsStagedChangeCul
-    Used for the text (when the cursor is on the same line as the sign) of 'change' staged signs.
-
-    Fallbacks: `HgsignsChangeCul` (fg=50%)
-                                                        *hl-HgsignsStagedDeleteCul*
-HgsignsStagedDeleteCul
-    Used for the text (when the cursor is on the same line as the sign) of 'delete' staged signs.
-
-    Fallbacks: `HgsignsDeleteCul` (fg=50%)
-                                                        *hl-HgsignsStagedChangedeleteCul*
-HgsignsStagedChangedeleteCul
-    Used for the text (when the cursor is on the same line as the sign) of 'changedelete' staged signs.
-
-    Fallbacks: `HgsignsChangedeleteCul` (fg=50%)
-                                                        *hl-HgsignsStagedTopdeleteCul*
-HgsignsStagedTopdeleteCul
-    Used for the text (when the cursor is on the same line as the sign) of 'topdelete' staged signs.
-
-    Fallbacks: `HgsignsTopdeleteCul` (fg=50%)
-                                                        *hl-HgsignsStagedUntrackedCul*
-HgsignsStagedUntrackedCul
-    Used for the text (when the cursor is on the same line as the sign) of 'untracked' staged signs.
-
-    Fallbacks: `HgsignsUntrackedCul` (fg=50%)
                                                         *hl-HgsignsAddPreview*
 HgsignsAddPreview
     Used for added lines in previews.
@@ -1381,9 +1153,9 @@ COMMAND                                                      *hgsigns-command*
 ==============================================================================
 SPECIFYING OBJECTS                          *hgsigns-object* *hgsigns-revision*
 
-Hgsigns objects are Git revisions as defined in the "SPECIFYING REVISIONS"
-section in the gitrevisions(7) man page. For commands that accept an optional
-base, the default is the file in the index. Examples:
+Hgsigns objects are Mercurial revisions as defined in the hg(1) man page
+(see 'hg help revisions'). For commands that accept an optional
+base, the default is the file in the working copy. Examples:
 
 Additionally, Hgsigns also accepts the value `FILE` to specify the working
 version of a file.
@@ -1414,7 +1186,7 @@ provided. `b:hgsigns_status` is formatted using `config.status_formatter`
         • `removed` - Number of removed lines.
         • `head` - Name of current HEAD (branch or short commit hash).
         • `root` - Top level directory of the working tree.
-        • `gitdir` - .git directory.
+        • `gitdir` - .hg directory.
 
 Example:
 >vim
