@@ -80,7 +80,7 @@ describe('gitdir_watcher (mercurial)', function()
     end)
 
     match_dag({
-      helpers.p('git%.repo%.watcher%.watcher%.handler: Git dir update:'),
+      helpers.p('git%.repo%.watcher%.watcher%.handler: Hg dir update:'),
       helpers.p('attach%.handle_moved%(1%): File moved to new name%.txt'),
       helpers.p(
         'attach%.handle_moved%(1%): Renamed buffer 1 from '
@@ -114,7 +114,7 @@ describe('gitdir_watcher (mercurial)', function()
     })
 
     match_dag({
-      helpers.p('git%.repo%.watcher%.watcher%.handler: Git dir update:'),
+      helpers.p('git%.repo%.watcher%.watcher%.handler: Hg dir update:'),
       helpers.p('attach%.repo_update_handler%(1%): Watcher handler called for buffer 1'),
     })
 
@@ -129,7 +129,7 @@ describe('gitdir_watcher (mercurial)', function()
     eq_path(test_file, helpers.api.nvim_buf_get_name(1))
 
     match_dag({
-      helpers.p('git%.repo%.watcher%.watcher%.handler: Git dir update:'),
+      helpers.p('git%.repo%.watcher%.watcher%.handler: Hg dir update:'),
       helpers.p('attach%.repo_update_handler%(1%): Watcher handler called for buffer 1'),
     })
   end)

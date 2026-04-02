@@ -131,7 +131,7 @@ local function complete_heads(arglead)
   local all = systemlist({ 'rev-parse', '--symbolic', '--branches', '--tags', '--remotes' }, {
     ignore_error = true,
     cwd = repo and repo.toplevel or nil,
-    vcs = 'git',
+    vcs = 'hg',
   })
 
   return vim.tbl_filter(function(x)
@@ -508,7 +508,7 @@ M.get_hunks = function(bufnr)
   return ret
 end
 
---- Run git blame on the current line and show the results in a
+--- Run hg blame on the current line and show the results in a
 --- floating window. If already open, calling this will cause the
 --- window to get focus.
 ---
@@ -527,7 +527,7 @@ C.blame_line = function(args, _)
   M.blame_line(args)
 end
 
---- Run git-blame on the current file and open the results
+--- Run hg blame on the current file and open the results
 --- in a scroll-bound vertical split.
 ---
 --- Mappings:
@@ -603,7 +603,7 @@ function M.change_base(base, global, callback)
   async_run(callback, function()
     local bufnr = current_buf()
     local bcache = cache[bufnr]
-    local vcs = bcache and bcache.git_obj.repo.vcs or 'git'
+    local vcs = bcache and bcache.git_obj.repo.vcs or 'hg'
     base = util.norm_base(base, vcs)
 
     if global then

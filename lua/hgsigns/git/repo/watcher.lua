@@ -195,7 +195,7 @@ function Watcher.handler(weak_self)
         return
       end
 
-      log.dprintf("Git dir update: '%s' %s", filename, inspect(events))
+      log.dprintf("Hg dir update: '%s' %s", filename, inspect(events))
     end
 
     self.notify_callbacks_debounced(weak_self)

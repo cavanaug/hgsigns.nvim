@@ -50,7 +50,7 @@
 --- @class (exact) Hgsigns.BlameOpts
 --- Ignore whitespace when running blame.
 --- @field ignore_whitespace? boolean
---- Extra options passed to `git-blame`.
+--- Extra options passed to `hg blame`.
 --- @field extra_opts? string[]
 
 --- @class (exact) Hgsigns.Config
@@ -280,7 +280,7 @@ M.schema = {
     },
     description = [[
       When opening a file, a libuv watcher is placed on the respective
-      `.git` directory to detect when changes happen to use as a trigger to
+      `.hg` directory to detect when changes happen to use as a trigger to
       update signs.
 
       Fields: ~
@@ -288,7 +288,7 @@ M.schema = {
             Whether the watcher is enabled.
 
         • `follow_files`:
-            If a file is moved with `git mv`, switch the buffer to the new location.
+            If a file is moved with `hg rename`, switch the buffer to the new location.
     ]],
   },
 
@@ -571,7 +571,7 @@ M.schema = {
         • use_focus: boolean
           Enable only when buffer is in focus
         • extra_opts: string[]
-          Extra options passed to `git-blame`.
+          Extra options passed to `hg blame`.
     ]],
   },
 
@@ -625,7 +625,7 @@ M.schema = {
 
       When a function:
         Parameters: ~
-          {name}       Git user name returned from `git config user.name` .
+          {name}       Hg user name returned from `hg config ui.username` .
           {blame_info} Table with the following keys:
                          • `abbrev_sha`: string
                          • `orig_lnum`: integer
@@ -644,7 +644,7 @@ M.schema = {
                          • `boundary`: true?
 
                        Note that the keys map onto the output of:
-                         `git blame --line-porcelain`
+                         `hg blame`
 
         Return: ~
           The result of this function is passed directly to the `opts.virt_text`
@@ -681,7 +681,7 @@ M.schema = {
     type = 'string',
     default = 'auto',
     description = [[
-      Version of git available. Set to 'auto' to automatically detect.
+      Version of hg available. Set to 'auto' to automatically detect.
     ]],
   },
 

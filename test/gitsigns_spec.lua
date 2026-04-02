@@ -120,7 +120,7 @@ describe('hgsigns (with screen)', function()
         'system.system: git .* ls%-files %-%-stage %-%-others %-%-exclude%-standard '
           .. path_pattern(test_file)
       ),
-      p('attach%.attach%(1%): Watching git dir .*'),
+      p('attach%.attach%(1%): Watching hg dir .*'),
     })
 
     check({
@@ -149,7 +149,7 @@ describe('hgsigns (with screen)', function()
       'attach.attach(1): Attaching (trigger=BufReadPost)',
       p('system.system: hg %-%-config ui%.relative%-paths=false root'),
       p('system.system: hg %-%-config ui%.relative%-paths=false branch'),
-      p('attach%.attach%(1%): Watching git dir .*%.hg'),
+      p('attach%.attach%(1%): Watching hg dir .*%.hg'),
     })
 
     check({
@@ -174,7 +174,7 @@ describe('hgsigns (with screen)', function()
     eq_path(scratch .. '/.hg', exec_lua([[return vim.b.hgsigns_status_dict.gitdir]]))
   end)
 
-  it('can open files not in a git repo', function()
+  it('can open files not in a hg repo', function()
     setup_hgsigns(config)
     local tmpfile = helpers.tempname()
     edit(tmpfile)
@@ -182,8 +182,8 @@ describe('hgsigns (with screen)', function()
     match_dag({
       p(attach_open_pat),
       p(revparse_pat),
-      p('git%.new: Not in git repo'),
-      p('attach%.attach%(1%): Empty git obj'),
+      p('git%.new: Not in hg repo'),
+      p('attach%.attach%(1%): Empty hg obj'),
     })
     command('Hgsigns clear_debug')
 
@@ -193,8 +193,8 @@ describe('hgsigns (with screen)', function()
     match_dag({
       p('attach%.attach%(1%): Attaching %(trigger=BufWritePost%)'),
       p(revparse_pat),
-      p('git%.new: Not in git repo'),
-      p('attach%.attach%(1%): Empty git obj'),
+      p('git%.new: Not in hg repo'),
+      p('attach%.attach%(1%): Empty hg obj'),
     })
   end)
 
@@ -799,7 +799,7 @@ describe('hgsigns (with screen)', function()
           'attach.attach(1): Attaching (trigger=BufWritePost)',
           np(revparse_pat),
           np('system.system: git .* ls%-files .*'),
-          np('attach%.attach%(1%): Watching git dir .*'),
+          np('attach%.attach%(1%): Watching hg dir .*'),
         }
 
         if not internal_diff then
@@ -1352,7 +1352,7 @@ describe('hgsigns attach', function()
     edit(('fugitive://%s/.git//'):format(scratch))
     command('Hgsigns attach')
     match_debug_messages({
-      'attach.attach(1): Empty git obj',
+      'attach.attach(1): Empty hg obj',
     })
   end)
 
@@ -1418,7 +1418,7 @@ describe('hgsigns attach', function()
     eq_path(file, result.file)
   end)
 
-  it('can run diffthis/show when cwd is a subdir of a git repo (#1277)', function()
+  it('can run diffthis/show when cwd is a subdir of a hg repo (#1277)', function()
     helpers.git_init_scratch()
     local file = scratch .. '/sub/test'
     write_to_file(file, { 'hello' })
@@ -1490,7 +1490,7 @@ describe('hgsigns attach', function()
     match_dag({
       p('system.system: hg %-%-config ui%.relative%-paths=false root'),
       p("get_info_git: '.*' is outside worktree '.*'"),
-      p('attach%.attach%(1%): Empty git obj'),
+      p('attach%.attach%(1%): Empty hg obj'),
     })
   end)
 end)

@@ -322,7 +322,7 @@ M.attach = throttle_async({ hash = 1 }, function(cbuf, ctx, aucmd)
   local git_obj = git.Obj.new(file, revision, encoding, ctx.gitdir, toplevel)
 
   if not git_obj then
-    dprint('Empty git obj')
+    dprint('Empty hg obj')
     return
   end
 
@@ -373,7 +373,7 @@ M.attach = throttle_async({ hash = 1 }, function(cbuf, ctx, aucmd)
   cache[cbuf] = Cache.new(cbuf, file, git_obj)
 
   if git_obj.repo:has_watcher() then
-    dprintf('Watching git dir %s', git_obj.repo.gitdir)
+    dprintf('Watching hg dir %s', git_obj.repo.gitdir)
 
     --- Throttle to:
     --- - ensure handler is only triggered once per git operation.

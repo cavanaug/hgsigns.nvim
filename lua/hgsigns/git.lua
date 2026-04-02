@@ -150,7 +150,7 @@ function Obj.new(file, revision, encoding, gitdir, toplevel)
 
   local repo, err = Repo.get(cwd, gitdir, toplevel)
   if not repo then
-    log.dprint('Not in git repo')
+    log.dprint('Not in hg repo')
     if
       err
       and not err:match(errors.e.not_in_git)
@@ -168,7 +168,7 @@ function Obj.new(file, revision, encoding, gitdir, toplevel)
     -- If gitdir is explicitly passed (or set in the env with GIT_DIR)
     -- then resolution will succeed, but we still don't want to
     -- attach if `file` is inside the gitdir.
-    log.dprint('In gitdir')
+    log.dprint('In hgdir')
     return
   end
 

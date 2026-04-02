@@ -208,7 +208,7 @@ local function should_reload(bufnr)
   local response --- @type string?
   while not vim.tbl_contains({ 'O', 'L' }, response) do
     response = async.await(2, vim.ui.input, {
-      prompt = 'Warning: The git index has changed and the buffer was changed as well. [O]K, (L)oad File:',
+      prompt = 'Warning: The working copy has changed and the buffer was changed as well. [O]K, (L)oad File:',
     })
   end
   return response == 'L'

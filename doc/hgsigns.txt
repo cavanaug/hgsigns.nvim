@@ -304,11 +304,11 @@ blame({opts}, {callback})                                    *hgsigns.blame()*
                    • {ignore_whitespace}: (`boolean?`)
                      Ignore whitespace when running blame.
                    • {extra_opts}: (`string[]?`)
-                     Extra options passed to `git-blame`.
+                     Extra options passed to `hg blame`.
         {callback} (`(fun(err: string?))?`)
 
 blame_line({opts}, {callback})                          *hgsigns.blame_line()*
-    Run git blame on the current line and show the results in a
+    Run hg blame on the current line and show the results in a
     floating window. If already open, calling this will cause the
     window to get focus.
 
@@ -321,7 +321,7 @@ blame_line({opts}, {callback})                          *hgsigns.blame_line()*
                    • {ignore_whitespace}: (`boolean?`)
                      Ignore whitespace when running blame.
                    • {extra_opts}: (`string[]?`)
-                     Extra options passed to `git-blame`.
+                     Extra options passed to `hg blame`.
         {callback} (`(fun(err: string?))?`)
 
 get_hunks({bufnr})                                       *hgsigns.get_hunks()*
@@ -820,7 +820,7 @@ current_line_blame_opts               *hgsigns-config-current_line_blame_opts*
       • use_focus: boolean
         Enable only when buffer is in focus
       • extra_opts: string[]
-        Extra options passed to `git-blame`.
+        Extra options passed to `hg blame`.
 
 current_line_blame_formatter     *hgsigns-config-current_line_blame_formatter*
     Type: `string|function`, Default: `" <author>, <author_time:%R> - <summary> "`
@@ -871,7 +871,7 @@ current_line_blame_formatter     *hgsigns-config-current_line_blame_formatter*
 
     When a function:
       Parameters: ~
-        {name}       Git user name returned from `git config user.name` .
+        {name}       Hg user name returned from `hg config ui.username` .
         {blame_info} Table with the following keys:
                        • `abbrev_sha`: string
                        • `orig_lnum`: integer
