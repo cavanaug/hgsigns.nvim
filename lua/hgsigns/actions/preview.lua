@@ -15,22 +15,13 @@ local ns_inline = api.nvim_create_namespace('hgsigns_preview_inline')
 --- @param bufnr integer
 --- @param greedy? boolean
 --- @return Hgsigns.Hunk.Hunk? hunk
---- @return boolean? staged
-local function get_hunk_with_staged(bufnr, greedy)
+local function get_hunk(bufnr, greedy)
   local bcache = cache[bufnr]
   if not bcache then
     return
   end
 
-  local hunk = bcache:get_hunk(nil, greedy, false)
-  if hunk then
-    return hunk, false
-  end
-
-  hunk = bcache:get_hunk(nil, greedy, true)
-  if hunk then
-    return hunk, true
-  end
+  return bcache:get_hunk(nil, greedy)
 end
 
 local function clear_preview_inline(bufnr)
@@ -106,9 +97,8 @@ end
 --- @param bufnr integer
 --- @param nsd integer
 --- @param hunk Hgsigns.Hunk.Hunk
---- @param staged boolean?
 --- @return integer winid
-local function show_deleted_in_float(bufnr, nsd, hunk, staged)
+local function show_deleted_in_float(bufnr, nsd, hunk)
   local cwin = api.nvim_get_current_win()
   local virt_lines = {} --- @type [string, string][][]
   local textoff = assert(vim.fn.getwininfo(cwin)[1]).textoff --[[@as integer]]
@@ -130,8 +120,7 @@ local function show_deleted_in_float(bufnr, nsd, hunk, staged)
 
   local bcache = assert(cache[bufnr])
   local pbufnr = api.nvim_create_buf(false, true)
-  local text = staged and bcache.compare_text_head or bcache.compare_text
-  api.nvim_buf_set_lines(pbufnr, 0, -1, false, assert(text))
+  api.nvim_buf_set_lines(pbufnr, 0, -1, false, assert(bcache.compare_text))
 
   local width = api.nvim_win_get_width(0)
 
@@ -236,7 +225,7 @@ end)
 function M.preview_hunk_inline()
   local bufnr = current_buf()
 
-  local hunk, staged = get_hunk_with_staged(bufnr, true)
+  local hunk = get_hunk(bufnr, true)
 
   if not hunk then
     return
@@ -247,7 +236,7 @@ function M.preview_hunk_inline()
   local winid --- @type integer
   show_added(bufnr, ns_inline, hunk)
   if hunk.removed.count > 0 then
-    winid = show_deleted_in_float(bufnr, ns_inline, hunk, staged)
+    winid = show_deleted_in_float(bufnr, ns_inline, hunk)
   end
 
   api.nvim_create_autocmd({ 'CursorMoved', 'InsertEnter', 'BufLeave' }, {

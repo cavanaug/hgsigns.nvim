@@ -1,5 +1,4 @@
 local async = require('hgsigns.async')
-local Hunks = require('hgsigns.hunks')
 local cache = require('hgsigns.cache').cache
 local Popup = require('hgsigns.popup')
 
@@ -24,8 +23,6 @@ local api = vim.api
 --- @field preview? boolean
 --- Number of times to advance. Defaults to |v:count1|.
 --- @field count integer
---- Which kinds of hunks to target. Defaults to `'unstaged'`.
---- @field target 'unstaged'|'staged'|'all'
 
 --- @class hgsigns.nav
 local M = {}
@@ -64,39 +61,16 @@ local function process_nav_opts(opts)
     opts.count = vim.v.count1
   end
 
-  if opts.target == nil then
-    opts.target = 'unstaged'
-  end
-
   return opts --[[@as Hgsigns.NavOpts]]
 end
 
 --- @async
 --- @param bufnr integer
---- @param target 'unstaged'|'staged'|'all'
 --- @param greedy boolean
 --- @return Hgsigns.Hunk.Hunk[]
-local function get_nav_hunks(bufnr, target, greedy)
+local function get_nav_hunks(bufnr, greedy)
   local bcache = assert(cache[bufnr])
-  local hunks_main = bcache:get_hunks(greedy, false) or {}
-
-  local hunks --- @type Hgsigns.Hunk.Hunk[]
-  if target == 'unstaged' then
-    hunks = hunks_main
-  else
-    local hunks_head = bcache:get_hunks(greedy, true) or {}
-    hunks_head = Hunks.filter_common(hunks_head, hunks_main) or {}
-    if target == 'all' then
-      hunks = hunks_main
-      vim.list_extend(hunks, hunks_head)
-      table.sort(hunks, function(h1, h2)
-        return h1.added.start < h2.added.start
-      end)
-    elseif target == 'staged' then
-      hunks = hunks_head
-    end
-  end
-  return hunks
+  return bcache:get_hunks(greedy) or {}
 end
 
 --- @async
@@ -110,7 +84,7 @@ function M.nav_hunk(direction, opts)
     return
   end
 
-  local hunks = get_nav_hunks(bufnr, opts.target, opts.greedy)
+  local hunks = get_nav_hunks(bufnr, opts.greedy)
 
   if not hunks or vim.tbl_isempty(hunks) then
     if opts.navigation_message then
@@ -125,7 +99,7 @@ function M.nav_hunk(direction, opts)
   local forwards = direction == 'next' or direction == 'last'
 
   for _ = 1, opts.count do
-    index = Hunks.find_nearest_hunk(line, hunks, direction, opts.wrap)
+    index = require('hgsigns.hunks').find_nearest_hunk(line, hunks, direction, opts.wrap)
 
     if not index then
       if opts.navigation_message then

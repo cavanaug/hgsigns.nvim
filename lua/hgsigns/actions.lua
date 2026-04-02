@@ -326,7 +326,7 @@ function M.reset_hunk(range, opts, callback)
       return
     end
 
-    local hunk = bcache:get_hunk(range, opts.greedy ~= false, false)
+    local hunk = bcache:get_hunk(range, opts.greedy ~= false)
 
     if not hunk then
       api.nvim_echo({ { 'No hunk to reset', 'WarningMsg' } }, false, {})

@@ -16,7 +16,6 @@ local config = Config.config
 local api = vim.api
 
 local signs_normal = Signs.new()
-local signs_staged = Signs.new(true)
 
 --- @class hgsigns.manager
 local M = {}
@@ -50,24 +49,22 @@ function M.statuscolumn(bufnr, lnum)
 
   local res = {} --- @type string[]
   local res_len = 0
-  for _, signs in ipairs({ signs_normal, signs_staged }) do
-    local buf_signs = signs.signs[bufnr]
-    if buf_signs and next(buf_signs) then
-      local marks = api.nvim_buf_get_extmarks(
-        bufnr,
-        signs.ns,
-        { lnum - 1, 0 },
-        { lnum - 1, -1 },
-        {}
-      )
-      for _, mark in ipairs(marks) do
-        local id = mark[1]
-        local s = buf_signs[id]
-        if s then
-          vim.list_extend(res, { '%#' .. s[2] .. '#', s[1], '%*' })
-          --- @diagnostic disable-next-line: missing-parameter
-          res_len = res_len + vim.str_utfindex(s[1])
-        end
+  local buf_signs = signs_normal.signs[bufnr]
+  if buf_signs and next(buf_signs) then
+    local marks = api.nvim_buf_get_extmarks(
+      bufnr,
+      signs_normal.ns,
+      { lnum - 1, 0 },
+      { lnum - 1, -1 },
+      {}
+    )
+    for _, mark in ipairs(marks) do
+      local id = mark[1]
+      local s = buf_signs[id]
+      if s then
+        vim.list_extend(res, { '%#' .. s[2] .. '#', s[1], '%*' })
+        --- @diagnostic disable-next-line: missing-parameter
+        res_len = res_len + vim.str_utfindex(s[1])
       end
     end
   end
@@ -121,20 +118,6 @@ local function apply_win_signs(bufnr, top, bot, clear)
   local git_obj = bcache.git_obj
   local untracked = git_obj:is_untracked()
   apply_win_signs0(bufnr, signs_normal, bcache.hunks, top, bot, clear, untracked)
-  if signs_staged and git_obj:has_staging_area() then
-    apply_win_signs0(
-      bufnr,
-      signs_staged,
-      bcache.hunks_staged,
-      top,
-      bot,
-      clear,
-      false,
-      function(lnum)
-        return not signs_normal:contains(bufnr, lnum)
-      end
-    )
-  end
   if clear then
     redraw_statuscol(bufnr, top, bot)
   end
@@ -177,22 +160,12 @@ function M.on_lines(buf, first, last_orig, last_new)
   end
 
   signs_normal:on_lines(buf, first, last_orig, last_new)
-  if signs_staged and bcache.git_obj:has_staging_area() then
-    signs_staged:on_lines(buf, first, last_orig, last_new)
-  end
 
   -- Signs in changed regions get invalidated so we need to force a redraw if
   -- any signs get removed.
   if bcache.hunks and signs_normal:contains(buf, first, last_new) then
     -- Force a sign redraw on the next update (fixes #521)
     bcache.force_next_update = true
-  end
-
-  if signs_staged and bcache.git_obj:has_staging_area() then
-    if bcache.hunks_staged and signs_staged:contains(buf, first, last_new) then
-      -- Force a sign redraw on the next update (fixes #521)
-      bcache.force_next_update = true
-    end
   end
 
   M.update_sync_debounced(buf)
@@ -388,13 +361,13 @@ M.update = throttle_async({ hash = 1, schedule = true }, function(bufnr)
   bcache.update_on_view = nil
 
   update_lock(bcache, function()
-    local old_hunks, old_hunks_staged = bcache.hunks, bcache.hunks_staged
-    bcache.hunks, bcache.hunks_staged = nil, nil
+    local old_hunks = bcache.hunks
+    bcache.hunks = nil
 
     local git_obj = bcache.git_obj
     local file_mode = bcache.file_mode
 
-    if not bcache.compare_text or config._refresh_staged_on_update or file_mode then
+    if not bcache.compare_text or file_mode then
       if file_mode then
         bcache.compare_text = util.file_lines(git_obj.file)
       else
@@ -412,48 +385,9 @@ M.update = throttle_async({ hash = 1, schedule = true }, function(bufnr)
       return
     end
 
-    local bufname = api.nvim_buf_get_name(bufnr)
-    local rev_is_index = not git_obj:from_tree()
-    local supports_staged_signs = git_obj:has_staging_area()
-
-    if
-      supports_staged_signs
-      and config.signs_staged_enable
-      and not file_mode
-      and (rev_is_index or bufname:match('^fugitive://') or bufname:match('^hgsigns://'))
-    then
-      if not bcache.compare_text_head or config._refresh_staged_on_update then
-        -- When the revision is from the index, we compare against HEAD to
-        -- show the staged changes.
-        --
-        -- When showing a revision buffer (a buffer that represents the revision
-        -- of a specific file and does not have a corresponding file on disk), we
-        -- utilize the staged signs to represent the changes introduced in that
-        -- revision. Therefore we compare against the previous commit. Note there
-        -- should not be any normal signs for these buffers.
-        local staged_rev = rev_is_index and 'HEAD' or git_obj.revision .. '^'
-        bcache.compare_text_head = git_obj:get_show_text(staged_rev)
-        if not bcache:schedule(true) then
-          return
-        end
-      end
-      local hunks_head = run_diff(bcache.compare_text_head, buftext)
-      if not bcache:schedule() then
-        return
-      end
-      bcache.hunks_staged = Hunks.filter_common(hunks_head, bcache.hunks)
-    else
-      bcache.compare_text_head = nil
-      bcache.hunks_staged = nil
-    end
-
     -- Note the decoration provider may have invalidated bcache.hunks at this
     -- point
-    if
-      bcache.force_next_update
-      or Hunks.compare_heads(bcache.hunks, old_hunks)
-      or Hunks.compare_heads(bcache.hunks_staged, old_hunks_staged)
-    then
+    if bcache.force_next_update or Hunks.compare_heads(bcache.hunks, old_hunks) then
       -- Apply signs to the window. Other signs will be added by the decoration
       -- provider as they are drawn.
       apply_win_signs(bufnr, vim.fn.line('w0'), vim.fn.line('w$'), true)
@@ -483,9 +417,6 @@ function M.detach(bufnr, keep_signs)
   if not keep_signs then
     -- Remove all signs
     signs_normal:remove(bufnr)
-    if signs_staged then
-      signs_staged:remove(bufnr)
-    end
     redraw_statuscol(bufnr)
   end
 end
@@ -493,7 +424,6 @@ end
 function M.reset_signs()
   -- Remove all signs
   signs_normal:reset()
-  signs_staged:reset()
 end
 
 --- @param bufnr integer

@@ -950,7 +950,6 @@ describe('hgsigns (with screen)', function()
       check({
         status = { head = 'default', added = 2, changed = 0, removed = 0 },
         signs = { added = 2 },
-        staged_signs = {},
       })
 
       local result = exec_lua(function(bufnr)
@@ -958,18 +957,21 @@ describe('hgsigns (with screen)', function()
         return {
           file_state = bcache.git_obj.file_state,
           compare_text = bcache.compare_text,
-          staged_hunks = bcache.hunks_staged and #bcache.hunks_staged or 0,
+          has_staged_diffs = bcache.staged_diffs ~= nil,
         }
       end, api.nvim_get_current_buf())
 
       eq('added', result.file_state)
       eq({ '' }, result.compare_text)
-      eq(0, result.staged_hunks)
+      eq(false, result.has_staged_diffs)
     end)
 
     it('navigates previews and resets mercurial hunks against parent content', function()
       edit(test_file)
       wait_for_attach()
+      exec_lua(function()
+        require('hgsigns').statuscolumn(0, 1)
+      end)
 
       feed('ggccEDIT<esc>')
       feed('5GoADDED<esc>')
@@ -978,7 +980,6 @@ describe('hgsigns (with screen)', function()
       check({
         status = { head = 'default', added = 1, changed = 1, removed = 1 },
         signs = { changed = 1, added = 1, delete = 1 },
-        staged_signs = {},
       })
 
       local starts = exec_lua(function()
@@ -1008,6 +1009,21 @@ describe('hgsigns (with screen)', function()
         n('+EDIT'),
       })
 
+      local inline_preview = exec_lua(function()
+        require('hgsigns').preview_hunk_inline()
+        return vim.wait(5000, function()
+          return require('hgsigns.actions.preview').has_preview_inline(0)
+        end)
+      end)
+      eq(true, inline_preview)
+      local statuscolumn = exec_lua(function()
+        local lnum = vim.api.nvim_win_get_cursor(0)[1]
+        return require('hgsigns').statuscolumn(0, lnum)
+      end)
+      assert(type(statuscolumn) == 'string', vim.inspect(statuscolumn))
+      assert(#statuscolumn >= 2, statuscolumn)
+      eq(nil, statuscolumn:find('HgsignsStaged', 1, true))
+
       command([[lua require('hgsigns').nav_hunk('next', { navigation_message = false })]])
       expectf(function()
         eq(math.max(starts[2], 1), api.nvim_win_get_cursor(0)[1])
@@ -1018,9 +1034,21 @@ describe('hgsigns (with screen)', function()
       check({
         status = { head = 'default', added = 0, changed = 0, removed = 0 },
         signs = {},
-        staged_signs = {},
       })
       eq('This', api.nvim_buf_get_lines(0, 0, 1, false)[1])
+
+      local message = exec_lua(function()
+        local echoed --- @type string?
+        local old_echo = vim.api.nvim_echo
+        vim.api.nvim_echo = function(chunks, history, opts)
+          echoed = chunks[1] and chunks[1][1] or ''
+          return old_echo(chunks, history, opts)
+        end
+        require('hgsigns').nav_hunk('next', { navigation_message = true })
+        vim.api.nvim_echo = old_echo
+        return echoed or ''
+      end)
+      assert(message:find('No hunks', 1, true), message)
     end)
 
     it('reports mercurial file states for unknown and removed files', function()

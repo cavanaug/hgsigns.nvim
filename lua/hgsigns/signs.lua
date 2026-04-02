@@ -15,10 +15,7 @@ end
 --- @field lnum integer
 
 --- @class Hgsigns.Signs
---- @field name string
---- @field group string
 --- @field config table<Hgsigns.SignType,Hgsigns.SignConfig>
---- @field staged boolean
 --- @field ns integer
 --- @field signs table<integer,table<integer,[string,string?]?>?>
 --- @field private _hl_cache table<Hgsigns.SignType,table<string,string>>
@@ -46,7 +43,7 @@ function M:hl(ty, kind)
     return self._hl_cache[ty][kind]
   end
 
-  local result = ('Hgsigns%s%s%s'):format(self.staged and 'Staged' or '', capitalise(ty), km[kind])
+  local result = ('Hgsigns%s%s'):format(capitalise(ty), km[kind])
   self._hl_cache[ty][kind] = result
   return result
 end
@@ -156,17 +153,14 @@ function M:reset()
   end
 end
 
---- @param staged? boolean
 --- @return Hgsigns.Signs
-function M.new(staged)
+function M.new()
   local self = setmetatable({}, { __index = M })
-  self.config = staged and config.signs_staged or config.signs
-  Config.subscribe(staged and 'signs_staged' or 'signs', function()
-    self.config = staged and config.signs_staged or config.signs
+  self.config = config.signs
+  Config.subscribe('signs', function()
+    self.config = config.signs
   end)
-  self.staged = staged == true
-  self.group = 'hgsigns_signs_' .. (staged and 'staged' or '')
-  self.ns = api.nvim_create_namespace(self.group)
+  self.ns = api.nvim_create_namespace('hgsigns_signs')
   self.signs = {}
   return self
 end

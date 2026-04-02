@@ -623,27 +623,7 @@ local function check_signs(signs, bufnr)
   eq(signs, act, vim.inspect(buf_signs))
 end
 
---- @param signs table<string,integer>
---- @param bufnr integer
-local function check_staged_signs(signs, bufnr)
-  local act, buf_signs = collect_sign_counts(bufnr, function(name)
-    for t, hl in pairs({
-      added = 'HgsignsStagedAdd',
-      changed = 'HgsignsStagedChange',
-      delete = 'HgsignsStagedDelete',
-      changedelete = 'HgsignsStagedChangedelete',
-      topdelete = 'HgsignsStagedTopdelete',
-    }) do
-      if name == hl then
-        return t
-      end
-    end
-  end)
-
-  eq(signs, act, vim.inspect(buf_signs))
-end
-
---- @param attrs {signs?:table<string,integer>,staged_signs?:table<string,integer>,status?:table<string,string|integer>}
+--- @param attrs {signs?:table<string,integer>,status?:table<string,string|integer>}
 --- @param bufnr? integer
 function M.check(attrs, bufnr)
   bufnr = bufnr or 0
@@ -658,10 +638,6 @@ function M.check(attrs, bufnr)
 
     if attrs.signs then
       check_signs(attrs.signs, bufnr)
-    end
-
-    if attrs.staged_signs then
-      check_staged_signs(attrs.staged_signs, bufnr)
     end
   end)
 end

@@ -100,4 +100,27 @@ describe('highlights', function()
     assert(res.name:match('^HgsignsColorTemp%.fg%.%d+$') ~= nil)
     eq(0x00007F, res.fg)
   end)
+
+  it('does not generate staged highlight groups', function()
+    helpers.setup_path()
+
+    local names = helpers.exec_lua(function()
+      package.loaded['hgsigns.highlight'] = nil
+      local highlight = require('hgsigns.highlight')
+      local result = {}
+      for _, spec in ipairs(highlight.hls) do
+        result[#result + 1] = next(spec)
+      end
+      table.sort(result)
+      return result
+    end)
+
+    assert(vim.tbl_contains(names, 'HgsignsAdd'))
+    eq(false, vim.tbl_contains(names, 'HgsignsStagedAdd'))
+    eq(false, vim.tbl_contains(names, 'HgsignsStagedDelete'))
+
+    for _, name in ipairs(names) do
+      assert(not name:match('^HgsignsStaged'), table.concat(names, '\n'))
+    end
+  end)
 end)

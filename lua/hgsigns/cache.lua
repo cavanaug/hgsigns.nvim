@@ -27,10 +27,6 @@ local M = {
 ---
 --- @field file_mode?         boolean
 ---
---- @field compare_text_head? string[]
---- @field hunks_staged?      Hgsigns.Hunk.Hunk[]
----
---- @field staged_diffs       Hgsigns.Hunk.Hunk[]
 --- @field deregister_watcher? fun()
 --- @field git_obj            Hgsigns.GitObj
 --- @field blame?             Hgsigns.CacheEntry.Blame
@@ -54,14 +50,12 @@ end
 --- @param all? boolean
 function CacheEntry:invalidate(all)
   self.hunks = nil
-  self.hunks_staged = nil
   self.blame = nil
   self.commits = nil
   if all then
     -- The below doesn't need to be invalidated
     -- if the buffer changes
     self.compare_text = nil
-    self.compare_text_head = nil
   end
 end
 
@@ -74,7 +68,6 @@ function M.new(bufnr, file, git_obj)
     bufnr = bufnr,
     file = file,
     git_obj = git_obj,
-    staged_diffs = {},
     -- Snapshot HEAD OID so per-buffer invalidation can detect repo HEAD moves.
     -- `git_obj.repo.head_oid` is shared and may change between updates.
     head_oid = git_obj.repo.head_oid,
@@ -286,18 +279,12 @@ end
 
 --- @async
 --- @param greedy? boolean
---- @param staged? boolean
 --- @return Hgsigns.Hunk.Hunk[]?
-function CacheEntry:get_hunks(greedy, staged)
+function CacheEntry:get_hunks(greedy)
   if greedy and config.diff_opts.linematch then
     -- Re-run the diff without linematch
     local buftext = util.buf_lines(self.bufnr)
-    local text --- @type string[]?
-    if staged then
-      text = self.compare_text_head
-    else
-      text = self.compare_text
-    end
+    local text = self.compare_text
     if not text then
       return
     end
@@ -309,10 +296,6 @@ function CacheEntry:get_hunks(greedy, staged)
     return hunks
   end
 
-  if staged then
-    return self.hunks_staged and vim.deepcopy(self.hunks_staged) or nil
-  end
-
   return self.hunks and vim.deepcopy(self.hunks) or nil
 end
 
@@ -320,11 +303,7 @@ end
 --- @return Hgsigns.Hunk.Hunk? hunk
 --- @return integer? index
 function CacheEntry:get_cursor_hunk(hunks)
-  if not hunks then
-    hunks = {}
-    vim.list_extend(hunks, self.hunks or {})
-    vim.list_extend(hunks, self.hunks_staged or {})
-  end
+  hunks = hunks or self.hunks or {}
 
   local lnum = api.nvim_win_get_cursor(0)[1]
   local Hunks = require('hgsigns.hunks')
@@ -334,12 +313,11 @@ end
 --- @async
 --- @param range? [integer,integer]
 --- @param greedy? boolean
---- @param staged? boolean
 --- @return Hgsigns.Hunk.Hunk?
-function CacheEntry:get_hunk(range, greedy, staged)
+function CacheEntry:get_hunk(range, greedy)
   local Hunks = require('hgsigns.hunks')
 
-  local hunks = self:get_hunks(greedy, staged)
+  local hunks = self:get_hunks(greedy)
 
   if not range then
     return (self:get_cursor_hunk(hunks))
@@ -354,28 +332,9 @@ function CacheEntry:get_hunk(range, greedy, staged)
 
   local compare_text = assert(self.compare_text)
 
-  if staged then
-    local staged_top, staged_bot = top, bot
-    for _, h in ipairs(assert(self.hunks)) do
-      if top > h.vend then
-        staged_top = staged_top - (h.added.count - h.removed.count)
-      end
-      if bot > h.vend then
-        staged_bot = staged_bot - (h.added.count - h.removed.count)
-      end
-    end
-
-    hunk.added.lines = vim.list_slice(compare_text, staged_top, staged_bot)
-    hunk.removed.lines = vim.list_slice(
-      assert(self.compare_text_head),
-      hunk.removed.start,
-      hunk.removed.start + hunk.removed.count - 1
-    )
-  else
-    hunk.added.lines = api.nvim_buf_get_lines(self.bufnr, top - 1, bot, false)
-    hunk.removed.lines =
-      vim.list_slice(compare_text, hunk.removed.start, hunk.removed.start + hunk.removed.count - 1)
-  end
+  hunk.added.lines = api.nvim_buf_get_lines(self.bufnr, top - 1, bot, false)
+  hunk.removed.lines =
+    vim.list_slice(compare_text, hunk.removed.start, hunk.removed.start + hunk.removed.count - 1)
   return hunk
 end
 

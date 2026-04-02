@@ -18,15 +18,7 @@ local function process(raw_item, path)
   --- @cast raw_item table<any,any>
 
   local key = path[#path]
-  if
-    vim.tbl_contains({
-      'compare_text',
-      'compare_text_head',
-      'hunks',
-      'hunks_staged',
-      'staged_diffs',
-    }, key)
-  then
+  if vim.tbl_contains({ 'compare_text', 'hunks' }, key) then
     return { '...', length = #vim.tbl_keys(raw_item), head = raw_item[next(raw_item)] }
   elseif key == 'blame' then
     return { '...', length = #vim.tbl_keys(raw_item) }

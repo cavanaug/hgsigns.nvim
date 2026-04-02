@@ -21,14 +21,13 @@ local function capitalise(s)
   return s:sub(1, 1):upper() .. s:sub(2)
 end
 
----@param staged boolean
 ---@param kind ''|'Nr'|'Ln'|'Cul'
 ---@param ty 'add'|'change'|'delete'|'changedelete'|'topdelete'|'untracked'
 ---@return string? highlight
 ---@return Hgsigns.Hldef? spec
-local function gen_hl(staged, kind, ty)
+local function gen_hl(kind, ty)
   local cty = capitalise(ty)
-  local hl = ('Hgsigns%s%s%s'):format(staged and 'Staged' or '', cty, kind)
+  local hl = ('Hgsigns%s%s'):format(cty, kind)
 
   if kind == 'Ln' and (ty == 'delete' or 'ty' == 'topdelete') then
     return
@@ -46,9 +45,7 @@ local function gen_hl(staged, kind, ty)
   end
 
   local fallbacks --- @type string[]
-  if staged then
-    fallbacks = { ('Hgsigns%s%s'):format(cty, kind) }
-  elseif ty == 'changedelete' then
+  if ty == 'changedelete' then
     fallbacks = { 'HgsignsChange' .. kind }
   elseif ty == 'topdelete' then
     fallbacks = { 'HgsignsDelete' .. kind }
@@ -86,25 +83,20 @@ local function gen_hl(staged, kind, ty)
     }
   end
 
-  local sty = (staged and 'staged ' or '')
-
   --- @type Hgsigns.Hldef
   local spec = {
-    desc = ("Used for %s of '%s' %ssigns."):format(what, ty, sty),
-    fg_factor = staged and 0.5 or nil,
+    desc = ("Used for %s of '%s' signs."):format(what, ty),
     unpack(fallbacks),
   }
 
   return hl, spec
 end
 
-for _, staged in ipairs({ false, true }) do
-  for _, kind in ipairs({ '', 'Nr', 'Ln', 'Cul' }) do
-    for _, ty in ipairs({ 'add', 'change', 'delete', 'changedelete', 'topdelete', 'untracked' }) do
-      local hl, spec = gen_hl(staged, kind, ty)
-      if hl then
-        table.insert(M.hls, { [hl] = spec })
-      end
+for _, kind in ipairs({ '', 'Nr', 'Ln', 'Cul' }) do
+  for _, ty in ipairs({ 'add', 'change', 'delete', 'changedelete', 'topdelete', 'untracked' }) do
+    local hl, spec = gen_hl(kind, ty)
+    if hl then
+      table.insert(M.hls, { [hl] = spec })
     end
   end
 end

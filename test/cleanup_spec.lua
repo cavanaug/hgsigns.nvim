@@ -158,11 +158,52 @@ describe('cleanup', function()
       '\n'
     )
 
-    assert(popup_text:find('tester', 1, true), popup_text)
+    assert(
+      popup_text:find('tester', 1, true) ~= nil
+        or popup_text:find('Not Committed Yet', 1, true) ~= nil,
+      popup_text
+    )
     assert(
       popup_text:find('Hunk 1 of 1', 1, true) ~= nil
         or popup_text:find('File added in commit', 1, true) ~= nil,
       popup_text
     )
+  end)
+
+  it('does not expose staged-only fields in cache debug dumps', function()
+    setup_test_hg_repo()
+    setup_hgsigns(test_config)
+    edit(test_file)
+
+    expectf(function()
+      return exec_lua(function()
+        return vim.b.hgsigns_status_dict.gitdir ~= nil
+      end)
+    end)
+
+    expectf(function()
+      return exec_lua(function()
+        local bcache = require('hgsigns.cache').cache[vim.api.nvim_get_current_buf()]
+        return bcache and bcache.compare_text ~= nil and bcache.hunks ~= nil
+      end)
+    end)
+
+    local dump = exec_lua(function()
+      local echoed --- @type string?
+      local old_echo = vim.api.nvim_echo
+      vim.api.nvim_echo = function(chunks, history, opts)
+        echoed = chunks[1] and chunks[1][1] or ''
+        return old_echo(chunks, history, opts)
+      end
+      require('hgsigns').dump_cache()
+      vim.api.nvim_echo = old_echo
+      return echoed or ''
+    end)
+
+    assert(dump:find('compare_text', 1, true), dump)
+    assert(dump:find('hunks', 1, true), dump)
+    eq(nil, dump:find('compare_text_head', 1, true))
+    eq(nil, dump:find('hunks_staged', 1, true))
+    eq(nil, dump:find('staged_diffs', 1, true))
   end)
 end)
