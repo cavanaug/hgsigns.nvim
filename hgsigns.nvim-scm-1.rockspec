@@ -9,7 +9,7 @@ description = {
   detailed = [[
     Super fast Mercurial decorations implemented purely in Lua.
   ]],
-  homepage = 'http://github.com/lewis6991/hgsigns.nvim',
+  homepage = 'http://github.com/cavanaug/hgsigns.nvim',
   license = 'MIT/X11',
   labels = { 'neovim' }
 }
@@ -19,13 +19,13 @@ dependencies = {
 }
 
 source = {
-  url = 'http://github.com/lewis6991/hgsigns.nvim/archive/v' .. _MODREV .. '.zip',
+  url = 'http://github.com/cavanaug/hgsigns.nvim/archive/v' .. _MODREV .. '.zip',
   dir = 'hgsigns.nvim-' .. _MODREV,
 }
 
 if _MODREV == 'scm' then
   source = {
-    url = 'git://github.com/lewis6991/hgsigns.nvim',
+    url = 'git://github.com/cavanaug/hgsigns.nvim',
   }
 end
 
