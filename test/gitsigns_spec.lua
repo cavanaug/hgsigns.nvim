@@ -117,7 +117,7 @@ describe('hgsigns (with screen)', function()
       p('system.system: git .* config user.name'),
       p(revparse_pat),
       p(
-        'system.system: git .* ls%-files %-%-stage %-%-others %-%-exclude%-standard %-%-eol '
+        'system.system: git .* ls%-files %-%-stage %-%-others %-%-exclude%-standard '
           .. path_pattern(test_file)
       ),
       p('attach%.attach%(1%): Watching git dir .*'),
@@ -282,7 +282,7 @@ describe('hgsigns (with screen)', function()
         np(revparse_pat),
         np('system.system: git .* config user.name'),
         np(
-          'system.system: git .* ls%-files %-%-stage %-%-others %-%-exclude%-standard %-%-eol '
+          'system.system: git .* ls%-files %-%-stage %-%-others %-%-exclude%-standard '
             .. path_pattern(newfile)
         ),
         'attach.attach(1): Cannot resolve file in repo',
@@ -384,10 +384,6 @@ describe('hgsigns (with screen)', function()
       -- Add a file with windows line ending into the repo
       -- Disable autocrlf, so that the file keeps the \r\n file endings.
       blame_line_ui_test('false', 'dos')
-    end)
-
-    it('does handle autocrlf', function()
-      blame_line_ui_test('true', 'dos')
     end)
 
     it('does handle unix', function()
@@ -671,9 +667,7 @@ describe('hgsigns (with screen)', function()
         np(revparse_pat),
         np('system.system: git .* rev%-parse %-%-short HEAD'),
         np('system.system: git .* config user.name'),
-        np(
-          'system.system: git .* %-%-git%-dir .* %-%-stage %-%-others %-%-exclude%-standard %-%-eol.*'
-        ),
+        np('system.system: git .* %-%-git%-dir .* %-%-stage %-%-others %-%-exclude%-standard .*'),
         np('system.system: git .* check%-attr diff %-%-stdin'),
         n('attach.attach(1): User on_attach() returned false'),
       })
