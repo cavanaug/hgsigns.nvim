@@ -8,6 +8,7 @@ Require hg
 
 Set Shell "bash"
 Set FontSize 14
+Set FontFamily "MesloLGS Nerd Font"
 Set Width 900
 Set Height 550
 Set Theme { "background": "#2c2e34", "foreground": "#e2e2e3", "cursor": "#e2e2e3", "cursorAccent": "#2c2e34", "selection": "#3d3f4a" }
@@ -20,9 +21,9 @@ Type "cd /home/cavanaug/wip_other/projects/hgsigns_v2/gitsigns.nvim/mercurial"
 Enter
 Type "find ~/.local/state/nvim/swap -name '*demo_repos*' -delete 2>/dev/null; true"
 Enter
-Type "nvim --cmd 'set noswapfile' -c 'lua vim.diagnostic.config({virtual_text=false,signs=false})' media/demo_repos/hunks/demo.py"
+Type "nvim --cmd 'set noswapfile' -c 'lua vim.defer_fn(function() vim.diagnostic.config({virtual_text=false,signs=false,underline=false}) end,3000)' media/demo_repos/hunks/highlights.lua"
 Enter
-Sleep 4s
+Sleep 5s
 # Dismiss any startup prompts, then move to top
 Enter
 Sleep 300ms
@@ -47,15 +48,11 @@ Sleep 1.8s
 Escape
 Sleep 600ms
 
-# Navigate to a delete hunk
-Type "]h"
-Sleep 800ms
-
-# Navigate to added lines
+# Navigate through remaining hunks
 Type "]h"
 Sleep 800ms
 Type "]h"
-Sleep 600ms
+Sleep 800ms
 
 # Show diffthis split  (<leader>ghd)
 Type " ghd"
