@@ -134,6 +134,32 @@ describe('gitdir_watcher (mercurial)', function()
     })
   end)
 
+  it('does not delete alternate buffers when following moved files', function()
+    setup_test_hg_repo()
+    setup_hgsigns(test_config)
+    edit(test_file)
+    local tracked_buf = helpers.api.nvim_get_current_buf()
+
+    wait_for_attach()
+
+    local alt_file = helpers.scratch .. '/alt.txt'
+    helpers.write_to_file(alt_file, { 'alt buffer' })
+    edit(alt_file)
+    local alt_buf = helpers.api.nvim_get_current_buf()
+
+    command('buffer ' .. tracked_buf)
+
+    local test_file2 = test_file .. '2'
+    hg('mv', test_file, test_file2)
+
+    helpers.expectf(function()
+      eq_bufs({
+        [tracked_buf] = test_file2,
+        [alt_buf] = alt_file,
+      })
+    end)
+  end)
+
   it('debounces hg watcher refreshes across multiple buffers', function()
     helpers.hg_init_scratch()
 
