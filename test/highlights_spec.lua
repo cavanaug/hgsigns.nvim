@@ -87,7 +87,7 @@ describe('highlights', function()
       return { name = name, fg = info.fg }
     end)
 
-    assert(res.name:match('^HgsignsColorTemp%.fg%.%d+$') ~= nil)
+    assert(res.name:match('^GitSignsColorTemp%.fg%.%d+$') ~= nil)
     eq(0x00007F, res.fg)
   end)
 

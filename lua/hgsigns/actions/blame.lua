@@ -52,7 +52,7 @@ local function get_hash_color(sha)
     return hash_colors[color]
   end
 
-  local hl_name = string.format('HgsignsBlameColor.%s%s%s', r, g, b)
+  local hl_name = string.format('GitSignsBlameColor.%s%s%s', r, g, b)
   api.nvim_set_hl(0, hl_name, { fg = color })
   hash_colors[color] = hl_name
 

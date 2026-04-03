@@ -161,7 +161,7 @@ do --- temperature highlight
     end
 
     local fgs = fg and 'fg' or 'bg'
-    local hl_name = ('HgsignsColorTemp.%s.%d'):format(fgs, color)
+    local hl_name = ('GitSignsColorTemp.%s.%d'):format(fgs, color)
     api.nvim_set_hl(0, hl_name, { [fgs] = color })
     temp_colors[color] = hl_name
     return hl_name
