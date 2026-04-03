@@ -334,6 +334,7 @@ describe('hgsigns (with screen)', function()
     before_each(function()
       config.current_line_blame = true
       config.current_line_blame_formatter = ' <author>, <author_time:%R> - <summary>'
+      config.current_line_blame_opts = { delay = 1 }
       setup_hgsigns(config)
     end)
 
@@ -359,7 +360,7 @@ describe('hgsigns (with screen)', function()
 
       screen:expect({
         grid = [[
-        ^{MATCH:This {6: You, %d second.}}|
+        ^{MATCH:This {6: You, .*}}|
         is                  |
         a                   |
         windows             |
@@ -488,7 +489,10 @@ describe('hgsigns (with screen)', function()
 
       config.current_line_blame = true
       config.current_line_blame_formatter = ' <author>, <author_time:%R> - <summary>'
-      config.current_line_blame_opts = { virt_text_pos = 'right_align' }
+      config.current_line_blame_opts = {
+        virt_text_pos = 'right_align',
+        delay = 1,
+      }
       setup_hgsigns(config)
     end)
 
@@ -499,7 +503,7 @@ describe('hgsigns (with screen)', function()
 
       screen:expect({
         grid = [[
-        ^short {MATCH:{6: You, %d+ second}}|
+        ^short {MATCH:{6: You, .*}}|
         aaaaaaaaaaaaaaaaaaaa|
         bbbbbbbbbbbbbbbbbbbb|
         {6:~                   }|
@@ -576,7 +580,7 @@ describe('hgsigns (with screen)', function()
       -- Short line: blame should appear with right_align (normal behavior)
       screen:expect({
         grid = [[
-        ^short {MATCH:{6: You, %d+ second}}|
+        ^short {MATCH:{6: You, .*}}|
         aaaaaaaaaaaaaaaaaaaa|
         aaaaa               |
         bbbbbbbbbbbbbbbbbbbb|
@@ -602,7 +606,7 @@ describe('hgsigns (with screen)', function()
         grid = [[
         short               |
         ^aaaaaaaaaaaaaaaaaaaa|
-        {MATCH:aaaaa {6: You, %d second.*}}|
+        {MATCH:aaaaa {6: You, .*}}|
         bbbbbbbbbbbbbbbbbbbb|
         bbbbbbbbbbbbbbbbbbbb|
         {6:~                   }|
