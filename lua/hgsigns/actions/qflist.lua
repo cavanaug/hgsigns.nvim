@@ -85,7 +85,7 @@ local function buildqflist(target)
         if diff_attrs[f] ~= 'unset' then
           local f_abs = r.toplevel .. '/' .. f
           local stat = uv.fs_stat(f_abs)
-          if stat and stat.type == 'file' then
+          if changed_file.deleted or (stat and stat.type == 'file') then
             local base_relpath = changed_file.oldpath or f
             local a --- @type string[]
 
@@ -101,6 +101,9 @@ local function buildqflist(target)
                   a = { '' }
                 end
               end
+              local b = changed_file.deleted and {} or util.file_lines(f_abs)
+              local hunks = run_diff(a, b)
+              hunks_to_qflist(f_abs, hunks, qflist)
             else
               --- @type string
               local obj
@@ -109,11 +112,14 @@ local function buildqflist(target)
               else
                 obj = ':0:' .. f
               end
-              a = r:get_show_text(obj)
+              local a2, stderr = r:get_show_text(obj)
+              if stderr and changed_file.deleted and (not config.base or config.base == ':0') then
+                a2 = r:get_show_text('HEAD:' .. base_relpath)
+              end
+              local b = changed_file.deleted and {} or util.file_lines(f_abs)
+              local hunks = run_diff(a2, b)
+              hunks_to_qflist(f_abs, hunks, qflist)
             end
-
-            local hunks = run_diff(a, util.file_lines(f_abs))
-            hunks_to_qflist(f_abs, hunks, qflist)
           end
         end
       end

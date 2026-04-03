@@ -69,19 +69,39 @@ for _, kind in ipairs({ '', 'Nr', 'Ln', 'Cul' }) do
 end
 
 vim.list_extend(M.hls, {
-  { GitSignsAddPreview     = { desc = 'Used for added lines in previews.' } },
-  { GitSignsDeletePreview  = { desc = 'Used for deleted lines in previews.' } },
-  { GitSignsNoEOLPreview   = { desc = 'Used for "No newline at end of file".' } },
+  { GitSignsAddPreview = { desc = 'Used for added lines in previews.' } },
+  { GitSignsDeletePreview = { desc = 'Used for deleted lines in previews.' } },
+  { GitSignsNoEOLPreview = { desc = 'Used for "No newline at end of file".' } },
   { GitSignsCurrentLineBlame = { desc = 'Used for current line blame.' } },
-  { GitSignsAddInline      = { desc = 'Used for added word diff regions in inline previews.' } },
-  { GitSignsDeleteInline   = { desc = 'Used for deleted word diff regions in inline previews.' } },
-  { GitSignsChangeInline   = { desc = 'Used for changed word diff regions in inline previews.' } },
-  { GitSignsAddLnInline    = { desc = 'Used for added word diff regions when `config.word_diff == true`.' } },
-  { GitSignsChangeLnInline = { desc = 'Used for changed word diff regions when `config.word_diff == true`.' } },
-  { GitSignsDeleteLnInline = { desc = 'Used for deleted word diff regions when `config.word_diff == true`.' } },
-  { GitSignsDeleteVirtLn   = { desc = 'Used for deleted lines shown by inline `preview_hunk_inline()` or `show_deleted()`.' } },
-  { GitSignsDeleteVirtLnInLine = { desc = 'Used for word diff regions in lines shown by inline `preview_hunk_inline()` or `show_deleted()`.' } },
-  { GitSignsVirtLnum       = { desc = 'Used for line numbers in inline hunks previews.' } },
+  { GitSignsAddInline = { desc = 'Used for added word diff regions in inline previews.' } },
+  { GitSignsDeleteInline = { desc = 'Used for deleted word diff regions in inline previews.' } },
+  { GitSignsChangeInline = { desc = 'Used for changed word diff regions in inline previews.' } },
+  {
+    GitSignsAddLnInline = {
+      desc = 'Used for added word diff regions when `config.word_diff == true`.',
+    },
+  },
+  {
+    GitSignsChangeLnInline = {
+      desc = 'Used for changed word diff regions when `config.word_diff == true`.',
+    },
+  },
+  {
+    GitSignsDeleteLnInline = {
+      desc = 'Used for deleted word diff regions when `config.word_diff == true`.',
+    },
+  },
+  {
+    GitSignsDeleteVirtLn = {
+      desc = 'Used for deleted lines shown by inline `preview_hunk_inline()` or `show_deleted()`.',
+    },
+  },
+  {
+    GitSignsDeleteVirtLnInLine = {
+      desc = 'Used for word diff regions in lines shown by inline `preview_hunk_inline()` or `show_deleted()`.',
+    },
+  },
+  { GitSignsVirtLnum = { desc = 'Used for line numbers in inline hunks previews.' } },
 })
 
 -- No highlight setup needed: hgsigns relies entirely on GitSigns* groups which
