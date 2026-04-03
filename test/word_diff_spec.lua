@@ -101,7 +101,7 @@ describe('inline preview', function()
       local start_col0, end_col0 --- @type integer?, integer?
       for _, mark in ipairs(marks) do
         local details = mark[4]
-        if details and details.hl_group == 'HgsignsChangeInline' then
+        if details and details.hl_group == 'GitSignsChangeInline' then
           start_col0 = mark[3]
           end_col0 = details.end_col
           break

@@ -225,9 +225,9 @@ local function apply_word_diff(bufnr, row)
       ecol = scol + 1
     end
 
-    local hl_group = rtype == 'add' and 'HgsignsAddLnInline'
-      or rtype == 'change' and 'HgsignsChangeLnInline'
-      or 'HgsignsDeleteLnInline'
+    local hl_group = rtype == 'add' and 'GitSignsAddLnInline'
+      or rtype == 'change' and 'GitSignsChangeLnInline'
+      or 'GitSignsDeleteLnInline'
 
     local opts = {
       ephemeral = true,
@@ -281,19 +281,19 @@ local function show_deleted(bufnr, nsd, hunk)
         if rline > 1 then
           break
         end
-        vline[#vline + 1] = { line:sub(last_ecol, scol - 1), 'HgsignsDeleteVirtLn' }
-        vline[#vline + 1] = { line:sub(scol, ecol - 1), 'HgsignsDeleteVirtLnInline' }
+        vline[#vline + 1] = { line:sub(last_ecol, scol - 1), 'GitSignsDeleteVirtLn' }
+        vline[#vline + 1] = { line:sub(scol, ecol - 1), 'GitSignsDeleteVirtLnInline' }
         last_ecol = ecol
       end
     end
 
     if #line > 0 then
-      vline[#vline + 1] = { line:sub(last_ecol, -1), 'HgsignsDeleteVirtLn' }
+      vline[#vline + 1] = { line:sub(last_ecol, -1), 'GitSignsDeleteVirtLn' }
     end
 
     -- Add extra padding so the entire line is highlighted
     local padding = string.rep(' ', VIRT_LINE_LEN - #line)
-    vline[#vline + 1] = { padding, 'HgsignsDeleteVirtLn' }
+    vline[#vline + 1] = { padding, 'GitSignsDeleteVirtLn' }
 
     virt_lines[i] = vline
   end

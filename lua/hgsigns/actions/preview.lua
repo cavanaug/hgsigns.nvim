@@ -67,7 +67,7 @@ local function show_added(bufnr, nsw, hunk)
     local row = start_row + offset
     api.nvim_buf_set_extmark(bufnr, nsw, row, 0, {
       end_row = row + 1,
-      hl_group = 'HgsignsAddPreview',
+      hl_group = 'GitSignsAddPreview',
       hl_eol = true,
       priority = 1000,
     })
@@ -86,9 +86,9 @@ local function show_added(bufnr, nsw, hunk)
     api.nvim_buf_set_extmark(bufnr, nsw, start_row + offset, scol, {
       end_col = ecol,
       strict = not cr_at_eol_change,
-      hl_group = rtype == 'add' and 'HgsignsAddInline'
-        or rtype == 'change' and 'HgsignsChangeInline'
-        or 'HgsignsDeleteInline',
+      hl_group = rtype == 'add' and 'GitSignsAddInline'
+        or rtype == 'change' and 'GitSignsChangeInline'
+        or 'GitSignsDeleteInline',
       priority = 1001,
     })
   end
@@ -154,7 +154,7 @@ local function show_deleted_in_float(bufnr, nsd, hunk)
 
   for i = hunk.removed.start, hunk.removed.start + hunk.removed.count - 1 do
     api.nvim_buf_set_extmark(pbufnr, nsd, i - 1, 0, {
-      hl_group = 'HgsignsDeleteVirtLn',
+      hl_group = 'GitSignsDeleteVirtLn',
       hl_eol = true,
       end_row = i,
       priority = 1000,
@@ -169,7 +169,7 @@ local function show_deleted_in_float(bufnr, nsd, hunk)
     local start_col = region[3] - 1
     local end_col = region[4] - 1
     api.nvim_buf_set_extmark(pbufnr, nsd, start_row, start_col, {
-      hl_group = 'HgsignsDeleteVirtLnInline',
+      hl_group = 'GitSignsDeleteVirtLnInline',
       end_col = end_col,
       end_row = start_row,
       priority = 1001,

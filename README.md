@@ -148,6 +148,29 @@ Deep buffer integration for Mercurial
 
 - Newish version of hg. Older versions may not work with some features.
 
+## 🤝 Relationship to gitsigns.nvim
+
+hgsigns is designed as a **sibling plugin** to
+[gitsigns.nvim](https://github.com/lewis6991/gitsigns.nvim), intended to be
+used alongside it in the same Neovim configuration.  The two plugins together
+provide a unified VCS sign experience regardless of whether a buffer lives in a
+Git or Mercurial repository.
+
+This sibling relationship has two concrete implications:
+
+1. **Highlight groups** — hgsigns reuses the `GitSigns*` highlight groups
+   defined by gitsigns rather than introducing its own `Hgsigns*` groups.
+   Any colorscheme or `vim.api.nvim_set_hl` customisation you apply to
+   `GitSigns*` groups automatically applies to Mercurial signs too.  If
+   gitsigns is not installed you must define the required `GitSigns*` groups
+   yourself, or they will fall back to Neovim's built-in diff highlights
+   (`DiffAdd`, `DiffChange`, `DiffDelete`, …).
+
+2. **Keybindings** — the suggested keymaps use `<leader>g*` (matching
+   gitsigns' conventions) rather than `<leader>h*`, so VCS operations share
+   a single namespace regardless of the underlying VCS.  See the
+   [Keymaps](#-keymaps) section below.
+
 ## 🛠️ Installation & Usage
 
 Install using your package manager of choice. No setup required.
@@ -275,7 +298,6 @@ require('hgsigns').setup{
 > gitsigns, and keeps VCS operations under a single namespace regardless of
 > whether the underlying VCS is Git or Mercurial. If you already have gitsigns
 > bindings, swapping `gitsigns` for `hgsigns` in your config is all that's needed.
-
 ## 🔗 Plugin Integrations
 
 ### [trouble.nvim]

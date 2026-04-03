@@ -89,7 +89,7 @@ local function default_formatter(fmt)
     return {
       {
         expand_blame_format(fmt, username, blame_info),
-        'HgsignsCurrentLineBlame',
+        'GitSignsCurrentLineBlame',
       },
     }
   end

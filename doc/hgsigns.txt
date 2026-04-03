@@ -569,12 +569,12 @@ signs                                                   *hgsigns-config-signs*
       • `show_count` to enable showing count of hunk, e.g. number of deleted
         lines.
 
-    The highlights `Hgsigns[kind][type]` is used for each kind of sign. E.g.
-    'add' signs uses the highlights:
-      • `HgsignsAdd`   (for normal text signs)
-      • `HgsignsAddNr` (for signs when `config.numhl == true`)
-      • `HgsignsAddLn `(for signs when `config.linehl == true`)
-      • `HgsignsAddCul `(for signs when `config.culhl == true`)
+    The GitSigns highlights `GitSigns[kind][type]` are used for each kind of
+    sign. E.g. 'add' signs use the highlights:
+      • `GitSignsAdd`   (for normal text signs)
+      • `GitSignsAddNr` (for signs when `config.numhl == true`)
+      • `GitSignsAddLn `(for signs when `config.linehl == true`)
+      • `GitSignsAddCul `(for signs when `config.culhl == true`)
 
     See |hgsigns-highlight-groups|.
 
@@ -666,7 +666,7 @@ show_deleted                                     *hgsigns-config-show_deleted*
 
     Show the old version of hunks inline in the buffer (via virtual lines).
 
-    Note: Virtual lines currently use the highlight `HgsignsDeleteVirtLn`.
+    Note: Virtual lines currently use the highlight `GitSignsDeleteVirtLn`.
 
 diff_opts                                           *hgsigns-config-diff_opts*
     Type: `table[extended]`, Default: derived from 'diffopt'
@@ -786,7 +786,7 @@ current_line_blame                         *hgsigns-config-current_line_blame*
     Adds an unobtrusive and customisable blame annotation at the end of
     the current line.
 
-    The highlight group used for the text is `HgsignsCurrentLineBlame`.
+    The highlight group used for the text is `GitSignsCurrentLineBlame`.
 
 current_line_blame_opts               *hgsigns-config-current_line_blame_opts*
     Type: `table[extended]`
@@ -919,17 +919,17 @@ word_diff                                           *hgsigns-config-word_diff*
 
     Uses the highlights:
       • For word diff in previews:
-        • `HgsignsAddInline`
-        • `HgsignsChangeInline`
-        • `HgsignsDeleteInline`
+        • `GitSignsAddInline`
+        • `GitSignsChangeInline`
+        • `GitSignsDeleteInline`
       • For word diff in buffer:
-        • `HgsignsAddLnInline`
-        • `HgsignsChangeLnInline`
-        • `HgsignsDeleteLnInline`
+        • `GitSignsAddLnInline`
+        • `GitSignsChangeLnInline`
+        • `GitSignsDeleteLnInline`
       • For word diff in virtual lines (e.g. show_deleted):
-        • `HgsignsAddVirtLnInline`
-        • `HgsignsChangeVirtLnInline`
-        • `HgsignsDeleteVirtLnInline`
+        • `GitSignsAddVirtLnInline`
+        • `GitSignsChangeVirtLnInline`
+        • `GitSignsDeleteVirtLnInline`
 
 debug_mode                                         *hgsigns-config-debug_mode*
     Type: `boolean`, Default: `false`
@@ -945,186 +945,181 @@ These are the highlights groups used by Hgsigns.
 Note if a highlight is not defined, it will be automatically derived by
 searching for other defined highlights in order.
 
-                                                        *hl-HgsignsAdd*
-HgsignsAdd
+                                                        *hl-GitSignsAdd*
+GitSignsAdd
     Used for the text of 'add' signs.
 
-    Fallbacks: `GitGutterAdd`, `SignifySignAdd`, `DiffAddedGutter`, `Added`, `DiffAdd`
-                                                        *hl-HgsignsChange*
-HgsignsChange
+    Fallbacks: 
+                                                        *hl-GitSignsChange*
+GitSignsChange
     Used for the text of 'change' signs.
 
-    Fallbacks: `GitGutterChange`, `SignifySignChange`, `DiffModifiedGutter`, `Changed`, `DiffChange`
-                                                        *hl-HgsignsDelete*
-HgsignsDelete
+    Fallbacks: 
+                                                        *hl-GitSignsDelete*
+GitSignsDelete
     Used for the text of 'delete' signs.
 
-    Fallbacks: `GitGutterDelete`, `SignifySignDelete`, `DiffRemovedGutter`, `Removed`, `DiffDelete`
-                                                        *hl-HgsignsChangedelete*
-HgsignsChangedelete
+    Fallbacks: 
+                                                        *hl-GitSignsChangedelete*
+GitSignsChangedelete
     Used for the text of 'changedelete' signs.
 
-    Fallbacks: `HgsignsChange`
-                                                        *hl-HgsignsTopdelete*
-HgsignsTopdelete
+    Fallbacks: 
+                                                        *hl-GitSignsTopdelete*
+GitSignsTopdelete
     Used for the text of 'topdelete' signs.
 
-    Fallbacks: `HgsignsDelete`
-                                                        *hl-HgsignsUntracked*
-HgsignsUntracked
+    Fallbacks: 
+                                                        *hl-GitSignsUntracked*
+GitSignsUntracked
     Used for the text of 'untracked' signs.
 
-    Fallbacks: `HgsignsAdd`
-                                                        *hl-HgsignsAddNr*
-HgsignsAddNr
+    Fallbacks: 
+                                                        *hl-GitSignsAddNr*
+GitSignsAddNr
     Used for number column (when `config.numhl == true`) of 'add' signs.
 
-    Fallbacks: `GitGutterAddLineNr`, `HgsignsAdd`
-                                                        *hl-HgsignsChangeNr*
-HgsignsChangeNr
+    Fallbacks: 
+                                                        *hl-GitSignsChangeNr*
+GitSignsChangeNr
     Used for number column (when `config.numhl == true`) of 'change' signs.
 
-    Fallbacks: `GitGutterChangeLineNr`, `HgsignsChange`
-                                                        *hl-HgsignsDeleteNr*
-HgsignsDeleteNr
+    Fallbacks: 
+                                                        *hl-GitSignsDeleteNr*
+GitSignsDeleteNr
     Used for number column (when `config.numhl == true`) of 'delete' signs.
 
-    Fallbacks: `GitGutterDeleteLineNr`, `HgsignsDelete`
-                                                        *hl-HgsignsChangedeleteNr*
-HgsignsChangedeleteNr
+    Fallbacks: 
+                                                        *hl-GitSignsChangedeleteNr*
+GitSignsChangedeleteNr
     Used for number column (when `config.numhl == true`) of 'changedelete' signs.
 
-    Fallbacks: `HgsignsChangeNr`
-                                                        *hl-HgsignsTopdeleteNr*
-HgsignsTopdeleteNr
+    Fallbacks: 
+                                                        *hl-GitSignsTopdeleteNr*
+GitSignsTopdeleteNr
     Used for number column (when `config.numhl == true`) of 'topdelete' signs.
 
-    Fallbacks: `HgsignsDeleteNr`
-                                                        *hl-HgsignsUntrackedNr*
-HgsignsUntrackedNr
+    Fallbacks: 
+                                                        *hl-GitSignsUntrackedNr*
+GitSignsUntrackedNr
     Used for number column (when `config.numhl == true`) of 'untracked' signs.
 
-    Fallbacks: `HgsignsAddNr`
-                                                        *hl-HgsignsAddLn*
-HgsignsAddLn
+    Fallbacks: 
+                                                        *hl-GitSignsAddLn*
+GitSignsAddLn
     Used for buffer line (when `config.linehl == true`) of 'add' signs.
 
-    Fallbacks: `GitGutterAddLine`, `SignifyLineAdd`, `DiffAdd`
-                                                        *hl-HgsignsChangeLn*
-HgsignsChangeLn
+    Fallbacks: 
+                                                        *hl-GitSignsChangeLn*
+GitSignsChangeLn
     Used for buffer line (when `config.linehl == true`) of 'change' signs.
 
-    Fallbacks: `GitGutterChangeLine`, `SignifyLineChange`, `DiffChange`
-                                                        *hl-HgsignsChangedeleteLn*
-HgsignsChangedeleteLn
+    Fallbacks: 
+                                                        *hl-GitSignsChangedeleteLn*
+GitSignsChangedeleteLn
     Used for buffer line (when `config.linehl == true`) of 'changedelete' signs.
 
-    Fallbacks: `HgsignsChangeLn`
-                                                        *hl-HgsignsTopdeleteLn*
-HgsignsTopdeleteLn
-    Used for buffer line (when `config.linehl == true`) of 'topdelete' signs.
-
-    Fallbacks: `HgsignsDeleteLn`
-                                                        *hl-HgsignsUntrackedLn*
-HgsignsUntrackedLn
+    Fallbacks: 
+                                                        *hl-GitSignsUntrackedLn*
+GitSignsUntrackedLn
     Used for buffer line (when `config.linehl == true`) of 'untracked' signs.
 
-    Fallbacks: `HgsignsAddLn`
-                                                        *hl-HgsignsAddCul*
-HgsignsAddCul
+    Fallbacks: 
+                                                        *hl-GitSignsAddCul*
+GitSignsAddCul
     Used for the text (when the cursor is on the same line as the sign) of 'add' signs.
 
-    Fallbacks: `HgsignsAdd`
-                                                        *hl-HgsignsChangeCul*
-HgsignsChangeCul
+    Fallbacks: 
+                                                        *hl-GitSignsChangeCul*
+GitSignsChangeCul
     Used for the text (when the cursor is on the same line as the sign) of 'change' signs.
 
-    Fallbacks: `HgsignsChange`
-                                                        *hl-HgsignsDeleteCul*
-HgsignsDeleteCul
+    Fallbacks: 
+                                                        *hl-GitSignsDeleteCul*
+GitSignsDeleteCul
     Used for the text (when the cursor is on the same line as the sign) of 'delete' signs.
 
-    Fallbacks: `HgsignsDelete`
-                                                        *hl-HgsignsChangedeleteCul*
-HgsignsChangedeleteCul
+    Fallbacks: 
+                                                        *hl-GitSignsChangedeleteCul*
+GitSignsChangedeleteCul
     Used for the text (when the cursor is on the same line as the sign) of 'changedelete' signs.
 
-    Fallbacks: `HgsignsChangeCul`
-                                                        *hl-HgsignsTopdeleteCul*
-HgsignsTopdeleteCul
+    Fallbacks: 
+                                                        *hl-GitSignsTopdeleteCul*
+GitSignsTopdeleteCul
     Used for the text (when the cursor is on the same line as the sign) of 'topdelete' signs.
 
-    Fallbacks: `HgsignsDeleteCul`
-                                                        *hl-HgsignsUntrackedCul*
-HgsignsUntrackedCul
+    Fallbacks: 
+                                                        *hl-GitSignsUntrackedCul*
+GitSignsUntrackedCul
     Used for the text (when the cursor is on the same line as the sign) of 'untracked' signs.
 
-    Fallbacks: `HgsignsAddCul`
-                                                        *hl-HgsignsAddPreview*
-HgsignsAddPreview
+    Fallbacks: 
+                                                        *hl-GitSignsAddPreview*
+GitSignsAddPreview
     Used for added lines in previews.
 
-    Fallbacks: `GitGutterAddLine`, `SignifyLineAdd`, `DiffAdd`
-                                                        *hl-HgsignsDeletePreview*
-HgsignsDeletePreview
+    Fallbacks: 
+                                                        *hl-GitSignsDeletePreview*
+GitSignsDeletePreview
     Used for deleted lines in previews.
 
-    Fallbacks: `GitGutterDeleteLine`, `SignifyLineDelete`, `DiffDelete`
-                                                        *hl-HgsignsNoEOLPreview*
-HgsignsNoEOLPreview
+    Fallbacks: 
+                                                        *hl-GitSignsNoEOLPreview*
+GitSignsNoEOLPreview
     Used for "No newline at end of file".
 
-    Fallbacks: `DiffNoEOL`, `Constant`
-                                                        *hl-HgsignsCurrentLineBlame*
-HgsignsCurrentLineBlame
+    Fallbacks: 
+                                                        *hl-GitSignsCurrentLineBlame*
+GitSignsCurrentLineBlame
     Used for current line blame.
 
-    Fallbacks: `NonText`
-                                                        *hl-HgsignsAddInline*
-HgsignsAddInline
+    Fallbacks: 
+                                                        *hl-GitSignsAddInline*
+GitSignsAddInline
     Used for added word diff regions in inline previews.
 
-    Fallbacks: `TermCursor`
-                                                        *hl-HgsignsDeleteInline*
-HgsignsDeleteInline
+    Fallbacks: 
+                                                        *hl-GitSignsDeleteInline*
+GitSignsDeleteInline
     Used for deleted word diff regions in inline previews.
 
-    Fallbacks: `TermCursor`
-                                                        *hl-HgsignsChangeInline*
-HgsignsChangeInline
+    Fallbacks: 
+                                                        *hl-GitSignsChangeInline*
+GitSignsChangeInline
     Used for changed word diff regions in inline previews.
 
-    Fallbacks: `TermCursor`
-                                                        *hl-HgsignsAddLnInline*
-HgsignsAddLnInline
+    Fallbacks: 
+                                                        *hl-GitSignsAddLnInline*
+GitSignsAddLnInline
     Used for added word diff regions when `config.word_diff == true`.
 
-    Fallbacks: `HgsignsAddInline`
-                                                        *hl-HgsignsChangeLnInline*
-HgsignsChangeLnInline
+    Fallbacks: 
+                                                        *hl-GitSignsChangeLnInline*
+GitSignsChangeLnInline
     Used for changed word diff regions when `config.word_diff == true`.
 
-    Fallbacks: `HgsignsChangeInline`
-                                                        *hl-HgsignsDeleteLnInline*
-HgsignsDeleteLnInline
+    Fallbacks: 
+                                                        *hl-GitSignsDeleteLnInline*
+GitSignsDeleteLnInline
     Used for deleted word diff regions when `config.word_diff == true`.
 
-    Fallbacks: `HgsignsDeleteInline`
-                                                        *hl-HgsignsDeleteVirtLn*
-HgsignsDeleteVirtLn
+    Fallbacks: 
+                                                        *hl-GitSignsDeleteVirtLn*
+GitSignsDeleteVirtLn
     Used for deleted lines shown by inline `preview_hunk_inline()` or `show_deleted()`.
 
-    Fallbacks: `GitGutterDeleteLine`, `SignifyLineDelete`, `DiffDelete`
-                                                        *hl-HgsignsDeleteVirtLnInLine*
-HgsignsDeleteVirtLnInLine
+    Fallbacks: 
+                                                        *hl-GitSignsDeleteVirtLnInLine*
+GitSignsDeleteVirtLnInLine
     Used for word diff regions in lines shown by inline `preview_hunk_inline()` or `show_deleted()`.
 
-    Fallbacks: `HgsignsDeleteLnInline`
-                                                        *hl-HgsignsVirtLnum*
-HgsignsVirtLnum
+    Fallbacks: 
+                                                        *hl-GitSignsVirtLnum*
+GitSignsVirtLnum
     Used for line numbers in inline hunks previews.
 
-    Fallbacks: `HgsignsDeleteVirtLn`
+    Fallbacks: 
 
 ==============================================================================
 COMMAND                                                      *hgsigns-command*

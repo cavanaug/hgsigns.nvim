@@ -1016,7 +1016,7 @@ describe('hgsigns (with screen)', function()
       end)
       assert(type(statuscolumn) == 'string', vim.inspect(statuscolumn))
       assert(#statuscolumn >= 2, statuscolumn)
-      eq(nil, statuscolumn:find('HgsignsStaged', 1, true))
+      eq(nil, statuscolumn:find('GitSignsStaged', 1, true))
 
       command([[lua require('hgsigns').nav_hunk('next', { navigation_message = false })]])
       expectf(function()
@@ -1179,8 +1179,8 @@ describe('hgsigns (with screen)', function()
 
     eq(
       {
-        '%#HgsignsChange#~%* ',
-        '%#HgsignsAdd#+%* ',
+        '%#GitSignsChange#~%* ',
+        '%#GitSignsAdd#+%* ',
       },
       exec_lua(function(test_buf0, other_buf0)
         return {

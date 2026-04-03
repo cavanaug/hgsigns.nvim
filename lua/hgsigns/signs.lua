@@ -43,7 +43,7 @@ function M:hl(ty, kind)
     return self._hl_cache[ty][kind]
   end
 
-  local result = ('Hgsigns%s%s'):format(capitalise(ty), km[kind])
+  local result = ('GitSigns%s%s'):format(capitalise(ty), km[kind])
   self._hl_cache[ty][kind] = result
   return result
 end

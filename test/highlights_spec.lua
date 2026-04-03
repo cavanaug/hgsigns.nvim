@@ -63,19 +63,9 @@ describe('highlights', function()
 
     setup_hgsigns(config)
 
-    local nvim10 = helpers.fn.has('nvim-0.10') > 0
-
-    expectf(function()
-      match_dag({
-        p('Deriving HgsignsAdd from ' .. (nvim10 and 'Added' or 'DiffAdd')),
-        p('Deriving HgsignsAddLn from DiffAdd'),
-        p('Deriving HgsignsAddNr from HgsignsAdd'),
-        p('Deriving HgsignsChangeLn from DiffChange'),
-        p('Deriving HgsignsChangeNr from HgsignsChange'),
-        p('Deriving HgsignsDelete from ' .. (nvim10 and 'Removed' or 'DiffDelete')),
-        p('Deriving HgsignsDeleteNr from HgsignsDelete'),
-      })
-    end)
+    -- hgsigns reuses GitSigns* highlight groups directly and does not derive
+    -- its own groups, so there is nothing to assert about highlight derivation
+    -- here.  The test simply verifies setup completes without error.
   end)
 
   it('update when colorscheme changes', function()
@@ -115,12 +105,12 @@ describe('highlights', function()
       return result
     end)
 
-    assert(vim.tbl_contains(names, 'HgsignsAdd'))
-    eq(false, vim.tbl_contains(names, 'HgsignsStagedAdd'))
-    eq(false, vim.tbl_contains(names, 'HgsignsStagedDelete'))
+    assert(vim.tbl_contains(names, 'GitSignsAdd'))
+    eq(false, vim.tbl_contains(names, 'GitSignsStagedAdd'))
+    eq(false, vim.tbl_contains(names, 'GitSignsStagedDelete'))
 
     for _, name in ipairs(names) do
-      assert(not name:match('^HgsignsStaged'), table.concat(names, '\n'))
+      assert(not name:match('^GitSignsStaged'), table.concat(names, '\n'))
     end
   end)
 end)

@@ -587,12 +587,12 @@ end
 local function check_signs(signs, bufnr)
   local act, buf_signs = collect_sign_counts(bufnr, function(name)
     for t, hl in pairs({
-      added = 'HgsignsAdd',
-      changed = 'HgsignsChange',
-      delete = 'HgsignsDelete',
-      changedelete = 'HgsignsChangedelete',
-      topdelete = 'HgsignsTopdelete',
-      untracked = 'HgsignsUntracked',
+      added = 'GitSignsAdd',
+      changed = 'GitSignsChange',
+      delete = 'GitSignsDelete',
+      changedelete = 'GitSignsChangedelete',
+      topdelete = 'GitSignsTopdelete',
+      untracked = 'GitSignsUntracked',
     }) do
       if name == hl then
         return t

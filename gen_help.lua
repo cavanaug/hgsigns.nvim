@@ -297,9 +297,13 @@ end
 local function normalize_namespace(s)
   local legacy_lower = table.concat({ 'git', 'signs' })
   local legacy_title = table.concat({ 'Git', 'signs' })
-  local legacy_camel = table.concat({ 'Git', 'Signs' })
 
-  return s:gsub(legacy_camel, 'Hgsigns'):gsub(legacy_title, 'Hgsigns'):gsub(legacy_lower, 'hgsigns')
+  -- Note: GitSigns* (camelCase) are highlight group names intentionally reused
+  -- from gitsigns.nvim — do NOT replace them.  Only Gitsigns (title-case) and
+  -- gitsigns (lower-case) namespace references need rewriting.
+  s = s:gsub(legacy_title, 'Hgsigns')
+  s = s:gsub(legacy_lower, 'hgsigns')
+  return s
 end
 
 local function parse_fence_lang(s)

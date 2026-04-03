@@ -237,12 +237,12 @@ M.schema = {
         • `show_count` to enable showing count of hunk, e.g. number of deleted
           lines.
 
-      The highlights `Hgsigns[kind][type]` is used for each kind of sign. E.g.
-      'add' signs uses the highlights:
-        • `HgsignsAdd`   (for normal text signs)
-        • `HgsignsAddNr` (for signs when `config.numhl == true`)
-        • `HgsignsAddLn `(for signs when `config.linehl == true`)
-        • `HgsignsAddCul `(for signs when `config.culhl == true`)
+      The GitSigns highlights `GitSigns[kind][type]` are used for each kind of
+      sign. E.g. 'add' signs use the highlights:
+        • `GitSignsAdd`   (for normal text signs)
+        • `GitSignsAddNr` (for signs when `config.numhl == true`)
+        • `GitSignsAddLn `(for signs when `config.linehl == true`)
+        • `GitSignsAddCul `(for signs when `config.culhl == true`)
 
       See |hgsigns-highlight-groups|.
     ]],
@@ -355,7 +355,7 @@ M.schema = {
     description = [[
       Show the old version of hunks inline in the buffer (via virtual lines).
 
-      Note: Virtual lines currently use the highlight `HgsignsDeleteVirtLn`.
+      Note: Virtual lines currently use the highlight `GitSignsDeleteVirtLn`.
     ]],
   },
 
@@ -535,7 +535,7 @@ M.schema = {
       Adds an unobtrusive and customisable blame annotation at the end of
       the current line.
 
-      The highlight group used for the text is `HgsignsCurrentLineBlame`.
+      The highlight group used for the text is `GitSignsCurrentLineBlame`.
     ]],
   },
 
@@ -708,17 +708,17 @@ M.schema = {
 
       Uses the highlights:
         • For word diff in previews:
-          • `HgsignsAddInline`
-          • `HgsignsChangeInline`
-          • `HgsignsDeleteInline`
+          • `GitSignsAddInline`
+          • `GitSignsChangeInline`
+          • `GitSignsDeleteInline`
         • For word diff in buffer:
-          • `HgsignsAddLnInline`
-          • `HgsignsChangeLnInline`
-          • `HgsignsDeleteLnInline`
+          • `GitSignsAddLnInline`
+          • `GitSignsChangeLnInline`
+          • `GitSignsDeleteLnInline`
         • For word diff in virtual lines (e.g. show_deleted):
-          • `HgsignsAddVirtLnInline`
-          • `HgsignsChangeVirtLnInline`
-          • `HgsignsDeleteVirtLnInline`
+          • `GitSignsAddVirtLnInline`
+          • `GitSignsChangeVirtLnInline`
+          • `GitSignsDeleteVirtLnInline`
     ]],
   },
 
