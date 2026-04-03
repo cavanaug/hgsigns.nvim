@@ -22,6 +22,72 @@ local write_to_file = helpers.write_to_file
 
 helpers.env()
 
+local watcher_fallback_test_config = vim.tbl_deep_extend('force', vim.deepcopy(test_config), {
+  _allow_fs_poll_fallback = true,
+  watch_gitdir = {
+    enable = true,
+    follow_files = true,
+  },
+})
+
+--- @param with_poll? boolean
+local function install_failing_fs_watchers(with_poll)
+  helpers.exec_lua(function(with_poll0)
+    local uv = vim.uv or vim.loop
+
+    local function new_fake_handle(fields)
+      local handle = fields or {}
+      handle._closed = false
+
+      function handle:stop() end
+
+      function handle:close()
+        self._closed = true
+      end
+
+      function handle:is_closing()
+        return self._closed
+      end
+
+      return handle
+    end
+
+    uv.new_fs_event = function()
+      local handle = new_fake_handle()
+
+      function handle:start(_, _, cb)
+        vim.schedule(function()
+          if not self._closed then
+            cb('EMFILE', nil, nil)
+          end
+        end)
+        return 0
+      end
+
+      return handle
+    end
+
+    if not with_poll0 then
+      return
+    end
+
+    local poll_id = 0
+
+    uv.new_fs_poll = function()
+      poll_id = poll_id + 1
+
+      local handle = new_fake_handle({ _id = poll_id })
+
+      function handle:start(path, _, cb)
+        self._path = path
+        self._cb = cb
+        return 0
+      end
+
+      return handle
+    end
+  end, with_poll)
+end
 local function get_bufs()
   local bufs = {} --- @type table<integer, string>
   for _, b in ipairs(helpers.api.nvim_list_bufs()) do
@@ -80,7 +146,7 @@ describe('gitdir_watcher (mercurial)', function()
     end)
 
     match_dag({
-      helpers.p('git%.repo%.watcher%.watcher%.handler: Hg dir update:'),
+      helpers.p('Hg dir update:'),
       helpers.p('attach%.handle_moved%(1%): File moved to new name%.txt'),
       helpers.p(
         'attach%.handle_moved%(1%): Renamed buffer 1 from '
@@ -114,7 +180,7 @@ describe('gitdir_watcher (mercurial)', function()
     })
 
     match_dag({
-      helpers.p('git%.repo%.watcher%.watcher%.handler: Hg dir update:'),
+      helpers.p('Hg dir update:'),
       helpers.p('attach%.repo_update_handler%(1%): Watcher handler called for buffer 1'),
     })
 
@@ -129,7 +195,7 @@ describe('gitdir_watcher (mercurial)', function()
     eq_path(test_file, helpers.api.nvim_buf_get_name(1))
 
     match_dag({
-      helpers.p('git%.repo%.watcher%.watcher%.handler: Hg dir update:'),
+      helpers.p('Hg dir update:'),
       helpers.p('attach%.repo_update_handler%(1%): Watcher handler called for buffer 1'),
     })
   end)
@@ -299,5 +365,60 @@ describe('gitdir_watcher (mercurial)', function()
     eq(true, result.watcher_gced)
     eq(true, result.cache_cleared)
     eq(true, result.handle_closed)
+  end)
+
+  it('falls back to fs_poll when fs_event fails', function()
+    setup_test_hg_repo()
+    install_failing_fs_watchers()
+
+    setup_hgsigns(watcher_fallback_test_config)
+    edit(test_file)
+
+    helpers.expectf(function()
+      return helpers.exec_lua(function()
+        local bcache = require('hgsigns.cache').cache[vim.api.nvim_get_current_buf()]
+        return bcache ~= nil
+          and bcache.git_obj.repo._watcher ~= nil
+          and bcache.git_obj.repo._watcher._backend == 'fs_poll'
+          and vim.b.hgsigns_status_dict.gitdir ~= nil
+      end)
+    end)
+
+    hg('commit', '-m', 'external commit', '-u', 'tester', '--allow-empty')
+
+    helpers.check({ status = { head = 'default', added = 0, changed = 0, removed = 0 }, signs = {} })
+  end)
+
+  it('recreates fs_poll watches after poll errors', function()
+    setup_test_hg_repo()
+    install_failing_fs_watchers(true)
+
+    setup_hgsigns(watcher_fallback_test_config)
+    edit(test_file)
+
+    helpers.expectf(function()
+      return helpers.exec_lua(function()
+        local bcache = require('hgsigns.cache').cache[vim.api.nvim_get_current_buf()]
+        return bcache ~= nil
+          and bcache.git_obj.repo._watcher ~= nil
+          and bcache.git_obj.repo._watcher._backend == 'fs_poll'
+      end)
+    end)
+
+    eq(
+      true,
+      helpers.exec_lua(function()
+        local bcache = require('hgsigns.cache').cache[vim.api.nvim_get_current_buf()]
+        local repo = assert(bcache).git_obj.repo
+        local watcher = assert(repo._watcher)
+        local watched_path, old = next(watcher.handles)
+        assert(watched_path and old)
+
+        old._cb('ENOENT', nil, nil)
+
+        local new = assert(watcher.handles[watched_path])
+        return old:is_closing() and new ~= old and not new:is_closing()
+      end)
+    )
   end)
 end)
