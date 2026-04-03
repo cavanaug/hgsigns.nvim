@@ -52,18 +52,19 @@ local function expect_hunks(exp_hunks)
   end)
 end
 
-local delay = 10
+local delay = 1
 
 --- @param cmd string
 local function command(cmd)
-  helpers.sleep(delay)
   api.nvim_command(cmd)
 
   -- Flaky tests, add a large delay between commands.
   -- Flakiness is due to actions being async and problems occur when an action
   -- is run while another action or update is running.
   -- Must wait for actions and updates to finish.
-  helpers.sleep(delay)
+  if delay > 0 then
+    helpers.sleep(delay)
+  end
 end
 
 local function retry(f)
@@ -74,14 +75,15 @@ local function retry(f)
     --- @type boolean, string?
     ok, err = pcall(f)
     if ok then
+      delay = orig_delay
       return
     end
     delay = math.ceil(delay * 1.6)
     print('failed, retrying with delay', delay)
   end
 
+  delay = orig_delay
   if err then
-    delay = orig_delay
     error(err)
   end
 end
