@@ -33,7 +33,7 @@ Our HEAD at time of evaluation: `49aad3c` (2026-04-03)
 | `e5c4b72` | fix(qflist): include tracked deletions in all list | ported | `repo.lua`: added `deleted` flag (hg `R` status); `qflist.lua`: enters diff path for deleted files; test updated to assert 1 Removed hunk instead of 0 |
 | `21018b0` | fix(hunks): apply zero-count hunks at insert point | ported | Rename only — two-line logic fix in `hunks.lua` |
 | `944ef13` | fix(statuscolumn): render signs in live statuscolumn | ported | Rename only — resolve `bufnr=0` + set `statuscolumn_active` in `manager.lua` |
-| `e1fb542` | test(harness): trim redundant waits | deferred | Test timing tweaks only; low priority |
-| `a655548` | test(gitsigns): tolerate extra vimgrep path messages | deferred | Test assertion loosening only; low priority |
-| `87b7902` | ci(test): speed up the functional suite | deferred | Take Makefile/gitignore additions only; skip CI YAML and test sleep changes |
+| `e1fb542` | test(harness): trim redundant waits | ported | Mechanical: delay 10→1, drop pre-command sleep, restore delay on success, cap expectf backoff at 50ms |
+| `a655548` | test(gitsigns): tolerate extra vimgrep path messages | ported | Replaced nvim-0.12 branch with expectf-based screen.messages loop |
+| `87b7902` | ci(test): speed up the functional suite | partial | ci.yml + Makefile + debounce_spec + git_spec + gitsigns_spec ported; actions_spec sleep(500)/update_events hunk skipped (staging subsystem removed) |
 | `d1e88d7` | test(scratch): isolate repos and seed scratch copies | deferred | Major `gs_helpers.lua` rewrite; needs full hg translation of scratch repo seeding |
