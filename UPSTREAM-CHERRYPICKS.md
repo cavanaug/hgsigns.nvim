@@ -22,7 +22,7 @@ Our HEAD at time of evaluation: `49aad3c` (2026-04-03)
 
 | SHA | Subject | Status | Notes |
 |-----|---------|--------|-------|
-| `c5480c0` | fix(uv): do not rely on gc to cleanup handles | pending | Drop `w_crlf` lines from `git.lua`; verify `ls_tree`/`file_info` in our `repo.lua` before applying |
+| `c5480c0` | fix(uv): do not rely on gc to cleanup handles | ported | Dropped `w_crlf` lines (already removed); `ls_tree` assert tightening and `file_info` simplification applied cleanly; test file changes skipped (git-specific helpers) |
 | `1189caf` | fix(watcher): fall back to fs_poll on fs_event failure | pending | Translate `_fs_poll_targets()` — upstream watches `gitdir/HEAD`, `gitdir/index`, `commondir/packed-refs`; ours should watch `.hg/dirstate`, `.hg/branch`, `.hg/bookmarks` |
 | `e1b90b6` | build(emmylua): bump analyzer to 0.22.0 | pending | Mechanical Makefile bump + remove now-unnecessary casts |
 | `9a64d19` | fix(diff): avoid false EOF hunk markers | ported | Rename only — `>=` → `>` in two `no_nl_at_eof` conditions in `diff_int.lua` |

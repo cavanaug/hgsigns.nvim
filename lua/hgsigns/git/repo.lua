@@ -29,10 +29,14 @@ local parse_hg_status_lines --- @type fun(lines: string[]): Hgsigns.Repo.HgStatu
 --- @field username string
 --- @field private _lock Hgsigns.async.Semaphore
 --- @field private _watcher? Hgsigns.Repo.Watcher
+--- @field private _refs integer
 --- @field head_oid? string
 --- @field head_ref? string
 --- @field commondir string
 local M = {}
+
+--- @type table<string,Hgsigns.Repo?>
+local repo_cache = setmetatable({}, { __mode = 'v' })
 
 --- @param gitdir string?
 --- @return boolean
@@ -611,8 +615,31 @@ function M:get_previous_path(revision, relpath)
   return self:diff_rename_status(revision, true)[relpath] or relpath
 end
 
---- @type table<string,Hgsigns.Repo?>
-local repo_cache = setmetatable({}, { __mode = 'v' })
+--- @private
+function M:_close()
+  repo_cache[self.gitdir] = nil
+  if self._watcher then
+    self._watcher:close()
+    self._watcher = nil
+  end
+end
+
+function M:ref()
+  self._refs = self._refs + 1
+  return self
+end
+
+function M:unref()
+  if self._refs == 0 then
+    return
+  end
+
+  self._refs = self._refs - 1
+
+  if self._refs == 0 then
+    self:_close()
+  end
+end
 
 --- @async
 --- @private
@@ -622,6 +649,7 @@ function M._new(info)
   --- @type Hgsigns.Repo
   local self = setmetatable(info, { __index = M })
   self._lock = async.semaphore(1)
+  self._refs = 0
   self.head_oid = info.head_oid
 
   if self.vcs == 'hg' then
@@ -725,6 +753,7 @@ function M.get(cwd, gitdir, toplevel)
       repo = M._new(info)
       repo_cache[info.gitdir] = repo
     end
+    repo:ref()
     return repo
   end)
 end

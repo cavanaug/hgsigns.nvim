@@ -372,6 +372,8 @@ function CacheEntry:destroy()
     self.deregister_watcher()
     self.deregister_watcher = nil
   end
+
+  self.git_obj:close()
 end
 
 ---@type table<integer,Hgsigns.CacheEntry?>
