@@ -23,14 +23,14 @@ Our HEAD at time of evaluation: `49aad3c` (2026-04-03)
 | SHA | Subject | Status | Notes |
 |-----|---------|--------|-------|
 | `c5480c0` | fix(uv): do not rely on gc to cleanup handles | ported | Dropped `w_crlf` lines (already removed); `ls_tree` assert tightening and `file_info` simplification applied cleanly; test file changes skipped (git-specific helpers) |
-| `1189caf` | fix(watcher): fall back to fs_poll on fs_event failure | pending | Translate `_fs_poll_targets()` — upstream watches `gitdir/HEAD`, `gitdir/index`, `commondir/packed-refs`; ours should watch `.hg/dirstate`, `.hg/branch`, `.hg/bookmarks` |
-| `e1b90b6` | build(emmylua): bump analyzer to 0.22.0 | pending | Mechanical Makefile bump + remove now-unnecessary casts |
+| `1189caf` | fix(watcher): fall back to fs_poll on fs_event failure | ported | Full watcher rewrite: FS_EVENT/FS_POLL backends, fallback logic, hg poll targets (dirstate/branch/bookmarks); `_allow_fs_poll_fallback` config added; two new tests added |
+| `e1b90b6` | build(emmylua): bump analyzer to 0.22.0 | ported | Mechanical Makefile bump + removed now-unnecessary casts |
 | `9a64d19` | fix(diff): avoid false EOF hunk markers | ported | Rename only — `>=` → `>` in two `no_nl_at_eof` conditions in `diff_int.lua` |
 | `733b0f6` | fix(watcher): preserve alternate buffers on rename | ported | `delete_alt()` → `delete_old_name_buffer()` in `util.lua`; new test translated to hg (`hg mv`, `setup_test_hg_repo`) |
-| `909f154` | fix(stage): keep add hunks undoable | pending | Apply `hunks.lua` one-line removal only; skip `actions_spec.lua` (staging test) |
+| `909f154` | fix(stage): keep add hunks undoable | ported | One-line removal in `hunks.lua`; staging test in `actions_spec.lua` skipped (removed subsystem) |
 | `720c6fc` | fix(qflist): tolerate nil attached hunks | ported | Rename only — replace `assert(bcache.hunks)` with nil guard in `qflist.lua` |
 | `fca7a4b` | fix(actions): repair show_commit history | ported | `<C-o>/<C-i>` history pointer fix in `show_commit.lua`; `modify/delete` conflict resolved by removing stray `lua/gitsigns/` copy |
-| `e5c4b72` | fix(qflist): include tracked deletions in all list | pending | `repo.lua` `deleted` flag is clean; `qflist.lua` uses `:0:` Git staging notation — review against our `hg cat` equivalent before applying |
+| `e5c4b72` | fix(qflist): include tracked deletions in all list | ported | `repo.lua`: added `deleted` flag (hg `R` status); `qflist.lua`: enters diff path for deleted files; test updated to assert 1 Removed hunk instead of 0 |
 | `21018b0` | fix(hunks): apply zero-count hunks at insert point | ported | Rename only — two-line logic fix in `hunks.lua` |
 | `944ef13` | fix(statuscolumn): render signs in live statuscolumn | ported | Rename only — resolve `bufnr=0` + set `statuscolumn_active` in `manager.lua` |
 | `e1fb542` | test(harness): trim redundant waits | deferred | Test timing tweaks only; low priority |
