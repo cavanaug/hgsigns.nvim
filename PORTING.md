@@ -158,7 +158,7 @@ need changes.
 
 ## 7. Quick Cherry-Pick Checklist
 
-1. Apply the upstream commit with `git cherry-pick -n <sha>`.
+1. Apply the upstream commit with `git cherry-pick -n -x <sha>`.
 2. Run `grep -r 'gitsigns\|Gitsigns\|GitSigns' lua/ plugin/ test/` — fix any
    un-renamed identifiers (use the rename map in section 2).
 3. Check whether the diff touches any of the **removed subsystems** in section
@@ -166,3 +166,28 @@ need changes.
 4. Check whether the diff adds new `git` CLI calls.  Translate them using
    section 3 and wrap them in the stabilization env from section 5.
 5. Run `make test` and `make format-check` to verify.
+6. Commit with a message referencing the upstream SHA:
+   `git commit -m "port: <subject> (upstream <short-sha>)"`
+7. Update `UPSTREAM-CHERRYPICKS.md` — change the row status from `pending` to
+   `ported` (or `partial` with a note if you modified or dropped hunks).
+
+---
+
+## 8. Upstream Cherry-Pick Log
+
+All upstream commits that have been evaluated — including ones deliberately
+skipped or deferred — are tracked in `UPSTREAM-CHERRYPICKS.md`.
+
+Before starting a new porting session:
+
+```bash
+# Check what upstream has that we don't
+git fetch upstream
+git log HEAD..upstream/main --oneline
+
+# Check what we've already evaluated (ported, skipped, or deferred)
+# by opening UPSTREAM-CHERRYPICKS.md and comparing SHAs
+```
+
+When evaluating a new batch, add a dated section to `UPSTREAM-CHERRYPICKS.md`
+with every commit's status and notes before starting work.
