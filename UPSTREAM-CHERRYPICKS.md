@@ -37,3 +37,28 @@ Our HEAD at time of evaluation: `49aad3c` (2026-04-03)
 | `a655548` | test(gitsigns): tolerate extra vimgrep path messages | ported | Replaced nvim-0.12 branch with expectf-based screen.messages loop |
 | `87b7902` | ci(test): speed up the functional suite | partial | ci.yml + Makefile + debounce_spec + git_spec + gitsigns_spec ported; actions_spec sleep(500)/update_events hunk skipped (staging subsystem removed) |
 | `d1e88d7` | test(scratch): isolate repos and seed scratch copies | deferred | Major `gs_helpers.lua` rewrite; needs full hg translation of scratch repo seeding |
+
+---
+
+## 2026-05-01 — upstream/main @ `dd3f588`
+
+Upstream HEAD at time of evaluation: `dd3f588` (2026-05-01)
+Our HEAD at time of evaluation: `88a2d91` (2026-05-01)
+
+| SHA | Subject | Status | Notes |
+|-----|---------|--------|-------|
+| `07ff073` | feat(render): inspect rendered buffers for hunk previews | ported | 7 new files under `lua/hgsigns/render/` and `lua/hgsigns/inspect/`; staging paths dropped from `preview.lua`; hg-specific `repo:command()` branch preserved in `blame_line.lua` |
+| `6d808f9` | feat(deleted_preview): allow horizontal scrolling of deleted virt_lines | ported | 4-line add of `VIRT_LINES_OVERFLOW` to `deleted_preview.lua` |
+| `8d82c24` | fix(word-diff): anchor EOF edits | ported | Rename only + 2 new test lines |
+| `4bafeca` | fix(nav): handle EOF delete hunks | ported | Staging tests dropped; new EOF nav test translated to hg |
+| `dd3f588` | fix(detach): don't pass tuple of nil | ported | Rename only |
+| `04d1ee7` | feat(cli): generate action completions from EmmyLua types | ported | New files: `cli/context.lua`, `cli/completion.lua`, `cli/completion/generated.lua`, `scripts/gen_completion.lua`, `scripts/gen_emydoc.lua`; staging-related action types dropped |
+| `f2ce545` | fix(cli): support repeatable flags and abbreviations | ported | Rename only; mergiraf auto-resolved conflicts |
+| `4ed47e8` | fix(attach): add attach opts and force manual attaches | ported | `gen_help.lua` updated for `@inlinedoc`/`@AttachOpts`; staging-related tests dropped; added `.sidecar/` and `.todos/` to `.gitignore` |
+| `4e34ff2` | feat(blame): add configurable side-panel formatting | ported | New file: `lua/hgsigns/blame_formatter.lua`; stale `lua/gitsigns/git/blame.lua` removed; `HgsignsBlameColor` and `HgsignsCurrentLineBlame` hl groups renamed |
+| `5433b29` | fix(blame): ignore summary rows when sizing panel | ported | `'gitsigns-blame'` filetype → `'hgsigns-blame'`; `GitSignsBlameColor` → `HgsignsBlameColor` in tests |
+| `42e6b87` | build(scripts): move generator files into scripts/ | ported | `gen_*.lua` moved to `scripts/`; Makefile + `generated.lua` paths updated |
+| `77b813d` | docs(readme): add luarocks badge | skipped | Badge-only change; not relevant to this fork |
+| `db486b4` | fix(git): handle redirected .git worktrees | skipped | Git-specific `GIT_DIR`/`GIT_WORK_TREE`/`core.worktree` logic; no hg equivalent |
+| `0d797da` | test(async): replace sleeps with event-driven waits | deferred | Large test harness change; depends on `d1e88d7` scratch isolation work |
+| `e7c0586` | test(harness): cleanup scratch at suite boundaries | deferred | Depends on `d1e88d7` scratch isolation work |
