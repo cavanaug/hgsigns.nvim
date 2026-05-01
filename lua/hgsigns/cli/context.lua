@@ -6,7 +6,7 @@ local argparse = require('hgsigns.cli.argparse')
 --- @field pos_args string[]
 
 local M = {}
-local COMMAND =  'Hgsigns'
+local COMMAND = 'Hgsigns'
 
 --- @param args string[]
 --- @param trailing_space boolean

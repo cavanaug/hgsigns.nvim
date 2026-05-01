@@ -253,8 +253,6 @@ local function apply_word_diff(bufnr, row)
   end
 end
 
-
-
 --- @param bufnr integer
 --- @return boolean
 local function buf_in_view(bufnr)

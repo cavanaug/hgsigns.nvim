@@ -26,10 +26,8 @@ local api = vim.api
 --- @param info Hgsigns.BlameInfoPublic
 --- @return Hgsigns.BlameHunkPreview
 local function get_blame_hunk(repo, info)
-  local removed_source, err_a = repo:get_show_text_at_revision(
-    assert(info.previous_sha),
-    assert(info.previous_filename)
-  )
+  local removed_source, err_a =
+    repo:get_show_text_at_revision(assert(info.previous_sha), assert(info.previous_filename))
   if err_a then
     error(err_a)
   end

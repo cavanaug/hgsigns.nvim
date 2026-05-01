@@ -269,9 +269,8 @@ describe('inline preview', function()
 
     local wins_before, wins_after, virt_line_count, leftcol = exec_lua(function()
       local wins0 = #vim.api.nvim_list_wins()
-      local markid = require('hgsigns.async')
-        .run(require('hgsigns.actions.preview').preview_hunk_inline)
-        :wait()
+      local markid =
+        require('hgsigns.async').run(require('hgsigns.actions.preview').preview_hunk_inline):wait()
       assert(markid, 'preview mark not found')
       local ns = vim.api.nvim_get_namespaces().hgsigns_preview_inline
       local marks = vim.api.nvim_buf_get_extmarks(0, ns, 0, -1, { details = true })
@@ -315,9 +314,8 @@ describe('inline preview', function()
 
     local wins_before, wins_after, virt_line_count, leftcol, top_row = exec_lua(function()
       local wins0 = #vim.api.nvim_list_wins()
-      local markid = require('hgsigns.async')
-        .run(require('hgsigns.actions.preview').preview_hunk_inline)
-        :wait()
+      local markid =
+        require('hgsigns.async').run(require('hgsigns.actions.preview').preview_hunk_inline):wait()
       assert(markid, 'preview mark not found')
 
       local ns = vim.api.nvim_get_namespaces().hgsigns_preview_inline
@@ -393,9 +391,8 @@ describe('inline preview', function()
     end)
 
     local rendered = exec_lua(function()
-      local markid = require('hgsigns.async')
-        .run(require('hgsigns.actions.preview').preview_hunk_inline)
-        :wait()
+      local markid =
+        require('hgsigns.async').run(require('hgsigns.actions.preview').preview_hunk_inline):wait()
       assert(markid)
 
       local ns = vim.api.nvim_get_namespaces().hgsigns_preview_inline
@@ -481,9 +478,8 @@ describe('inline preview', function()
       local expected_keyword0 = Inspect.hl_stack_at(inspected, 0)
       local expected_diff0 = Inspect.hl_stack_at(inspected, diff_col)
 
-      local markid = require('hgsigns.async')
-        .run(require('hgsigns.actions.preview').preview_hunk_inline)
-        :wait()
+      local markid =
+        require('hgsigns.async').run(require('hgsigns.actions.preview').preview_hunk_inline):wait()
       assert(markid)
 
       local ns_preview_inline = vim.api.nvim_get_namespaces().hgsigns_preview_inline
@@ -532,9 +528,7 @@ describe('inline preview', function()
 
     expectf(function()
       local deleted_row, changed_row = exec_lua(function()
-        require('hgsigns.async')
-          .run(require('hgsigns.actions.preview').preview_hunk_inline)
-          :wait()
+        require('hgsigns.async').run(require('hgsigns.actions.preview').preview_hunk_inline):wait()
         vim.cmd('redraw!')
 
         local function screenline(row, width)

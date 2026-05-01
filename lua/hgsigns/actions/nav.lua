@@ -101,7 +101,8 @@ function M.nav_hunk(direction, opts)
   local forwards = direction == 'next' or direction == 'last'
 
   for _ = 1, opts.count do
-    index = require('hgsigns.hunks').find_nearest_hunk(line, hunks, direction, opts.wrap, buf_line_count)
+    index =
+      require('hgsigns.hunks').find_nearest_hunk(line, hunks, direction, opts.wrap, buf_line_count)
 
     if not index then
       if opts.navigation_message then

@@ -15,6 +15,9 @@ package.path = table.concat({
   package.path,
 }, ';')
 
+local emydoc = require('gen_emydoc') --- @type GenEmmyDoc
+local strip_optional = emydoc.strip_optional
+
 local config = require('hgsigns.config')
 
 local INDENT = 4
@@ -48,59 +51,8 @@ local function get_ordered_schema_keys()
   return keys
 end
 
---- @alias EmmyDocLoc { file: string, line: integer }
---- @alias EmmyDocTag { tag_name: string, content: string }
---- @alias EmmyDocParam { name: string, typ: string, desc: string? }
---- @alias EmmyDocReturn { name: string?, typ: string, desc: string? }
---- @alias EmmyDocModule { name: string, members: EmmyDocFn[] }
-
---- @param ty EmmyDocTypeClass
---- @param tag string
---- @return boolean
-local function has_type_tag(ty, tag)
-  for _, tag_content in ipairs(ty.tag_content or {}) do
-    if tag_content.tag_name == tag then
-      return true
-    end
-  end
-
---- @class EmmyDocTypeField
---- @field type 'field'
---- @field name string
---- @field description string?
---- @field typ string
-
---- @alias EmmyDocTypeMember EmmyDocTypeField | EmmyDocFn
-
---- @class EmmyDocTypeClass
---- @field type 'class'
---- @field name string
---- @field bases string[]?
---- @field tag_content EmmyDocTag[]?
---- @field members EmmyDocTypeMember[]
---- @field description string?
-
---- @class EmmyDocTypeAlias
---- @field type 'alias'
---- @field name string
---- @field members EmmyDocTypeMember[]
-
---- @alias EmmyDocType EmmyDocTypeClass | EmmyDocTypeAlias
-
 --- @class EmmyDocTypeAttrs
 --- @field inlinedoc boolean
-
---- @class EmmyDocJson
---- @field modules EmmyDocModule[]
---- @field types EmmyDocType[]?
-
---- @return EmmyDocJson
-local function load_emmy_doc()
-  local path = 'emydoc/doc.json'
-  local raw = vim.fn.readfile(path)
-  local json = table.concat(raw, '\n')
-  return vim.json.decode(json, { luanil = { object = true, array = true } })
-end
 
 --- @param ty EmmyDocTypeClass
 --- @param tag string
@@ -323,18 +275,6 @@ local function md_links_to_vimdoc(s)
   return (s:gsub('%[%[([^%]]+)%]%]', '|%1|'))
 end
 
-local function normalize_namespace(s)
-  local legacy_lower = table.concat({ 'git', 'signs' })
-  local legacy_title = table.concat({ 'Git', 'signs' })
-
-  -- Note: GitSigns* (camelCase) are highlight group names intentionally reused
-  -- from gitsigns.nvim — do NOT replace them.  Only Gitsigns (title-case) and
-  -- hgsigns (lower-case) namespace references need rewriting.
-  s = s:gsub(legacy_title, 'Hgsigns')
-  s = s:gsub(legacy_lower, 'hgsigns')
-  return s
-end
-
 local function parse_fence_lang(s)
   local lang = s:match('^```%s*([%w_-]+)%s*$')
   if lang then
@@ -514,7 +454,7 @@ local function wrap_help_line(line, max_width)
   end
 
   -- Don't wrap function tag headers; they rely on column alignment.
-  if line:match('%*hgsigns%.') then
+  if line:match('%*gitsigns%.') then
     return { line }
   end
 
@@ -581,12 +521,6 @@ local function get_fields(ty, classes, fields_seen)
   end
 
   return ret
-end
-
---- @param ty string
---- @return string
-local function strip_optional(ty)
-  return (ty:gsub('%?$', ''))
 end
 
 --- @param name string
@@ -811,7 +745,7 @@ end
 --- @return table<string, EmmyDocTypeClass?>
 --- @return table<string, EmmyDocTypeAttrs?>
 local function load_classes()
-  local doc = load_emmy_doc()
+  local doc = emydoc.load()
   local classes = {} --- @type table<string, EmmyDocTypeClass?>
   local class_attrs = {} --- @type table<string, EmmyDocTypeAttrs?>
   for _, t in ipairs(doc.types or {}) do
@@ -935,7 +869,7 @@ local function render_fn_block(classes, class_attrs, member)
   end
 
   local sig = ('%s(%s)'):format(member.name, table.concat(args, ', '))
-  local header = ('%-40s%38s'):format(sig, '*hgsigns.' .. member.name .. '()*')
+  local header = ('%-40s%38s'):format(sig, '*gitsigns.' .. member.name .. '()*')
 
   return render_block(header, desc, params, returns, deprecated)
 end
@@ -1045,7 +979,7 @@ local function get_setup_from_readme()
   end
 
   for l in readme do
-    if l:match("require%('hgsigns'%).setup {") then
+    if l:match("require%('gitsigns'%).setup {") then
       append(l)
       break
     end
@@ -1093,7 +1027,7 @@ local function main()
         l1 = l1:gsub('{{' .. marker .. '}}', sub)
       end
     end
-    out:write(normalize_namespace(l1 or ''), '\n')
+    out:write(l1 or '', '\n')
   end
 end
 
