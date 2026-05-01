@@ -12,8 +12,8 @@ local window_ns_supported = api.nvim__ns_set ~= nil
 local ns_removed = api.nvim_create_namespace('hgsigns_removed')
 
 local VIRT_LINE_LEN = 300
-local REMOVED_VIRT_LINE_HL = 'HgsignsDeleteVirtLn'
-local REMOVED_INLINE_HL = 'HgsignsDeleteVirtLnInLine'
+local REMOVED_VIRT_LINE_HL = 'GitSignsDeleteVirtLn'
+local REMOVED_INLINE_HL = 'GitSignsDeleteVirtLnInLine'
 local VIRT_LINES_OVERFLOW = vim.fn.has('nvim-0.11') == 1 and 'scroll' or nil
 local win_ns = {} --- @type table<integer, {ns: integer, bufnr?: integer}>
 local states = {} --- @type table<integer, {hunks: Hgsigns.Hunk.Hunk[], lines: table<Hgsigns.Hunk.Hunk, Hgsigns.CapturedLine[]>, source_bufs: table<string, Hgsigns.HunkPreview.SourceBuf>, pending?: table<Hgsigns.Hunk.Hunk, true>, scheduled?: boolean}>
@@ -237,7 +237,7 @@ local function render_virt_lines(lines, start_lnum, opts)
     local win = assert(opts.win)
     prefix = function(line_index)
       return build_prefix(win, start_lnum + line_index - 1, {
-        extra_hl = 'HgsignsVirtLnum',
+        extra_hl = 'GitSignsVirtLnum',
       })
     end
   end

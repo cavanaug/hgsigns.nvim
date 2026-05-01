@@ -108,7 +108,7 @@ local function get_blame_virt_text(bcache, blame_info)
       BlameFormatter.expand_string(clb_formatter, git_obj.repo.username, blame_info, {
         self_author_text = 'You',
       }),
-      'HgsignsCurrentLineBlame',
+      'GitSignsCurrentLineBlame',
     },
   }
 end
