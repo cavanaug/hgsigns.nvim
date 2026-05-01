@@ -63,9 +63,8 @@ describe('highlights', function()
 
     setup_hgsigns(config)
 
-    -- hgsigns reuses GitSigns* highlight groups directly and does not derive
-    -- its own groups, so there is nothing to assert about highlight derivation
-    -- here.  The test simply verifies setup completes without error.
+    -- hgsigns defines Hgsigns* highlight groups and derives them from
+    -- Neovim's built-in diff highlights or colorscheme fallbacks.
   end)
 
   it('update when colorscheme changes', function()
@@ -87,7 +86,7 @@ describe('highlights', function()
       return { name = name, fg = info.fg }
     end)
 
-    assert(res.name:match('^GitSignsColorTemp%.fg%.%d+$') ~= nil)
+    assert(res.name:match('^HgsignsColorTemp%.fg%.%d+$') ~= nil)
     eq(0x00007F, res.fg)
   end)
 
@@ -105,12 +104,12 @@ describe('highlights', function()
       return result
     end)
 
-    assert(vim.tbl_contains(names, 'GitSignsAdd'))
-    eq(false, vim.tbl_contains(names, 'GitSignsStagedAdd'))
-    eq(false, vim.tbl_contains(names, 'GitSignsStagedDelete'))
+    assert(vim.tbl_contains(names, 'HgsignsAdd'))
+    eq(false, vim.tbl_contains(names, 'HgsignsStagedAdd'))
+    eq(false, vim.tbl_contains(names, 'HgsignsStagedDelete'))
 
     for _, name in ipairs(names) do
-      assert(not name:match('^GitSignsStaged'), table.concat(names, '\n'))
+      assert(not name:match('^HgsignsStaged'), table.concat(names, '\n'))
     end
   end)
 end)

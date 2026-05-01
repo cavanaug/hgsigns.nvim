@@ -8,15 +8,6 @@ local api = vim.api
 
 local M = {}
 
--- hgsigns reuses GitSigns highlight groups directly rather than defining its
--- own Hgsigns* groups.  This keeps the two sibling plugins visually consistent
--- — a single colorscheme / highlight customisation applies to both Git and
--- Mercurial signs without any extra user configuration.
---
--- The table below is exported for docgen only: each entry documents the
--- GitSigns* group that hgsigns will use so users know which groups to
--- customise.
-
 --- Use array of dict so we can iterate deterministically
 --- Export for docgen
 --- @type table<string,Hgsigns.Hldef>[]
@@ -34,7 +25,7 @@ end
 ---@return Hgsigns.Hldef? spec
 local function gen_hl(kind, ty)
   local cty = capitalise(ty)
-  local hl = ('GitSigns%s%s'):format(cty, kind)
+  local hl = ('Hgsigns%s%s'):format(cty, kind)
 
   if kind == 'Ln' and (ty == 'delete' or ty == 'topdelete') then
     return
@@ -69,54 +60,101 @@ for _, kind in ipairs({ '', 'Nr', 'Ln', 'Cul' }) do
 end
 
 vim.list_extend(M.hls, {
-  { GitSignsAddPreview = { desc = 'Used for added lines in previews.' } },
-  { GitSignsDeletePreview = { desc = 'Used for deleted lines in previews.' } },
-  { GitSignsNoEOLPreview = { desc = 'Used for "No newline at end of file".' } },
-  { GitSignsCurrentLineBlame = { desc = 'Used for current line blame.' } },
-  { GitSignsAddInline = { desc = 'Used for added word diff regions in inline previews.' } },
-  { GitSignsDeleteInline = { desc = 'Used for deleted word diff regions in inline previews.' } },
-  { GitSignsChangeInline = { desc = 'Used for changed word diff regions in inline previews.' } },
+  { HgsignsAddPreview = { desc = 'Used for added lines in previews.' } },
+  { HgsignsDeletePreview = { desc = 'Used for deleted lines in previews.' } },
+  { HgsignsNoEOLPreview = { desc = 'Used for "No newline at end of file".' } },
+  { HgsignsCurrentLineBlame = { desc = 'Used for current line blame.' } },
+  { HgsignsAddInline = { desc = 'Used for added word diff regions in inline previews.' } },
+  { HgsignsDeleteInline = { desc = 'Used for deleted word diff regions in inline previews.' } },
+  { HgsignsChangeInline = { desc = 'Used for changed word diff regions in inline previews.' } },
   {
-    GitSignsAddLnInline = {
+    HgsignsAddLnInline = {
       desc = 'Used for added word diff regions when `config.word_diff == true`.',
     },
   },
   {
-    GitSignsChangeLnInline = {
+    HgsignsChangeLnInline = {
       desc = 'Used for changed word diff regions when `config.word_diff == true`.',
     },
   },
   {
-    GitSignsDeleteLnInline = {
+    HgsignsDeleteLnInline = {
       desc = 'Used for deleted word diff regions when `config.word_diff == true`.',
     },
   },
   {
-    GitSignsDeleteVirtLn = {
+    HgsignsDeleteVirtLn = {
       desc = 'Used for deleted lines shown by inline `preview_hunk_inline()` or `show_deleted()`.',
     },
   },
   {
-    GitSignsDeleteVirtLnInLine = {
+    HgsignsDeleteVirtLnInLine = {
       desc = 'Used for word diff regions in lines shown by inline `preview_hunk_inline()` or `show_deleted()`.',
     },
   },
-  { GitSignsVirtLnum = { desc = 'Used for line numbers in inline hunks previews.' } },
+  { HgsignsVirtLnum = { desc = 'Used for line numbers in inline hunks previews.' } },
 })
-
--- No highlight setup needed: hgsigns relies entirely on GitSigns* groups which
--- are owned and registered by gitsigns.nvim.  If gitsigns is not installed the
--- user must define those groups themselves (or they fall back to Neovim's
--- built-in diff highlights).
-function M.setup()
-  -- Nothing to do — GitSigns* groups are not ours to create or derive.
-end
-
-M.setup_highlights = M.setup
 
 local function dprintf(fmt, ...)
   dprintf = require('hgsigns.debug.log').dprintf
   dprintf(fmt, ...)
+end
+
+--- @param hl string
+--- @return boolean
+local function is_hl_set(hl)
+  local exists, def = pcall(api.nvim_get_hl, 0, { name = hl, link = false })
+  return exists and next(def) ~= nil
+end
+
+--- @param hl string
+--- @param hldef Hgsigns.Hldef
+--- @param is_bg_light boolean
+local function derive(hl, hldef, is_bg_light)
+  local fallbacks = hldef --- @type string[]
+  if type(fallbacks[1]) == 'string' then
+    for _, fb in ipairs(fallbacks) do
+      if is_hl_set(fb) then
+        api.nvim_set_hl(0, hl, { link = fb })
+        dprintf('Derived %s from %s', hl, fb)
+        return
+      end
+    end
+  end
+
+  if hldef.fg_factor then
+    local base = fallbacks[1] or hl
+    local base_hl = api.nvim_get_hl(0, { name = base, link = false })
+    local fg = base_hl.fg
+    if fg then
+      api.nvim_set_hl(0, hl, { fg = cmix(fg, hldef.fg_factor) })
+      dprintf('Derived %s with fg_factor from %s', hl, base)
+      return
+    end
+  end
+
+  dprintf('No derivation found for %s', hl)
+end
+
+function M.setup_highlights()
+  local is_bg_light = vim.o.background == 'light'
+  for _, hlg in ipairs(M.hls) do
+    for hl, hldef in pairs(hlg) do
+      if is_hl_set(hl) then
+        dprintf('Highlight %s is already defined', hl)
+      else
+        derive(hl, hldef, is_bg_light)
+      end
+    end
+  end
+end
+
+function M.setup()
+  M.setup_highlights()
+  api.nvim_create_autocmd('ColorScheme', {
+    group = 'hgsigns',
+    callback = M.setup_highlights,
+  })
 end
 
 --- @param x? integer
@@ -183,7 +221,7 @@ do --- temperature highlight
     end
 
     local fgs = fg and 'fg' or 'bg'
-    local hl_name = ('GitSignsColorTemp.%s.%d'):format(fgs, color)
+    local hl_name = ('HgsignsColorTemp.%s.%d'):format(fgs, color)
     api.nvim_set_hl(0, hl_name, { [fgs] = color })
     temp_colors[color] = hl_name
     return hl_name
