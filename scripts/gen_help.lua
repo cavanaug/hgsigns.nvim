@@ -5,8 +5,11 @@ local inspect = vim.inspect
 local list_extend = vim.list_extend
 local startswith = vim.startswith
 
-local root = vim.fn.fnamemodify(debug.getinfo(1, 'S').source:sub(2), ':p:h')
+local script = vim.fn.fnamemodify(debug.getinfo(1, 'S').source:sub(2), ':p')
+local scripts_dir = vim.fn.fnamemodify(script, ':h')
+local root = vim.fn.fnamemodify(scripts_dir, ':h')
 package.path = table.concat({
+  scripts_dir .. '/?.lua',
   root .. '/lua/?.lua',
   root .. '/lua/?/init.lua',
   package.path,
@@ -23,7 +26,7 @@ local INDENT_STR = string.rep(' ', INDENT)
 -- in the order they are defined.
 --- @return string[]
 local function get_ordered_schema_keys()
-  local ci = io.lines('lua/hgsigns/config.lua') --- @type Iterator[string]
+  local ci = io.lines(root .. '/lua/hgsigns/config.lua') --- @type Iterator[string]
 
   for l in ci do
     if startswith(l, 'M.schema = {') then
@@ -326,7 +329,7 @@ local function normalize_namespace(s)
 
   -- Note: GitSigns* (camelCase) are highlight group names intentionally reused
   -- from gitsigns.nvim — do NOT replace them.  Only Gitsigns (title-case) and
-  -- gitsigns (lower-case) namespace references need rewriting.
+  -- hgsigns (lower-case) namespace references need rewriting.
   s = s:gsub(legacy_title, 'Hgsigns')
   s = s:gsub(legacy_lower, 'hgsigns')
   return s
@@ -590,7 +593,7 @@ end
 --- @return string
 local function get_type_tag(name)
   local short = name:gsub('^.-%.', ''):gsub('[^%w]', ''):lower()
-  return 'gitsigns-type-' .. short
+  return 'hgsigns-type-' .. short
 end
 
 --- @param name string
@@ -983,7 +986,7 @@ local function gen_functions_doc()
 
   local out = {} --- @type string[]
 
-  for _, class_name in ipairs({ 'gitsigns.main', 'gitsigns.actions' }) do
+  for _, class_name in ipairs({ 'hgsigns.main', 'hgsigns.actions' }) do
     local class = assert(classes[class_name], 'Class not found')
     for _, member in ipairs(get_class_functions(class)) do
       list_extend(out, render_fn_block(classes, class_attrs, member))
@@ -1034,7 +1037,7 @@ end
 
 --- @return string
 local function get_setup_from_readme()
-  local readme = io.lines('README.md') --- @type Iterator[string]
+  local readme = io.lines(root .. '/README.md') --- @type Iterator[string]
   local res = {} --- @type string[]
 
   local function append(line)
@@ -1072,9 +1075,9 @@ local function get_marker_text(marker)
 end
 
 local function main()
-  local template = io.lines('etc/doc_template.txt') --- @type Iterator[string]
+  local template = io.lines(root .. '/etc/doc_template.txt') --- @type Iterator[string]
 
-  local out = assert(io.open('doc/hgsigns.txt', 'w'))
+  local out = assert(io.open(root .. '/doc/hgsigns.txt', 'w'))
 
   for l in template do
     local l1 = l
