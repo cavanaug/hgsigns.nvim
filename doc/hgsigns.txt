@@ -131,7 +131,7 @@ setloclist({nr}, {target})                              *hgsigns.setloclist()*
         {async}
 
     Parameters: ~
-        {nr}     (`integer?`): Window number or the |window-ID|.
+        {nr}     (`(0|integer)?`): Window number or the |window-ID|.
                  `0` for the current window (default).
         {target} (`(integer|"attached"|"all")?`): See |hgsigns.setqflist()|.
 
@@ -143,7 +143,7 @@ setqflist({target}, {opts}, {callback})                  *hgsigns.setqflist()*
         {async}
 
     Parameters: ~
-        {target}   (`(integer|"attached"|"all")?`):
+        {target}   (`(0|integer|"attached"|"all")?`):
                    Specifies which files hunks are collected from.
                      Possible values.
                      • [integer]: The buffer with the matching buffer
@@ -196,7 +196,7 @@ show({revision}, {callback})                                  *hgsigns.show()*
         {async}
 
     Parameters: ~
-        {revision} (`string?`)
+        {revision} (`(string|"FILE")?`)
         {callback} (`(fun(err: string?))?`)
 
 diffthis({base}, {opts}, {callback})                      *hgsigns.diffthis()*
@@ -223,7 +223,8 @@ diffthis({base}, {opts}, {callback})                      *hgsigns.diffthis()*
         {async}
 
     Parameters: ~
-        {base}     (`string?`): Revision to diff against. Defaults to index.
+        {base}     (`(string|"FILE")?`): Revision to diff against. Defaults to
+                                         index.
         {opts}     (`Hgsigns.DiffthisOpts?`): Additional options.
                    • {vertical}: (`boolean?`)
                      Split window vertically. Default to
@@ -240,7 +241,7 @@ reset_base({global})                                    *hgsigns.reset_base()*
     Alias for `change_base(nil, {global})` .
 
     Parameters: ~
-        {global} (`any`)
+        {global} (`boolean?`): Change the base of all buffers.
 
 change_base({base}, {global}, {callback})               *hgsigns.change_base()*
     Change the base revision to diff against. If {base} is not
@@ -280,7 +281,7 @@ change_base({base}, {global}, {callback})               *hgsigns.change_base()*
     |hgsigns-revision|.
 
     Parameters: ~
-        {base}     (`string?`): The object/revision to diff against.
+        {base}     (`(string|"FILE")?`): The object/revision to diff against.
         {global}   (`boolean?`): Change the base of all buffers.
         {callback} (`(fun(err: string?))?`)
 
@@ -380,8 +381,27 @@ prev_hunk({opts}, {callback})                            *hgsigns.prev_hunk()*
         {async}
 
     Parameters: ~
-        {opts}     (`any`)
-        {callback} (`any`)
+        {opts}     (`Gitsigns.NavOpts?`): Configuration options.
+                   • {wrap}: (`boolean`)
+                     Whether to loop around file or not. Defaults to the value
+                     'wrapscan'
+                   • {foldopen}: (`boolean`)
+                     Expand folds when navigating to a hunk which is inside a
+                     fold. Defaults to `true` if 'foldopen' contains `search`.
+                   • {navigation_message}: (`boolean`)
+                     Whether to show navigation messages or not. Looks at
+                     'shortmess' for default behaviour.
+                   • {greedy}: (`boolean`)
+                     Only navigate between non-contiguous hunks. Only useful if
+                     'diff_opts' contains `linematch`. Defaults to `true`.
+                   • {preview}: (`boolean?`)
+                     Automatically open preview_hunk() upon navigating to a
+                     hunk.
+                   • {count}: (`integer`)
+                     Number of times to advance. Defaults to |v:count1|.
+                   • {target}: (`("unstaged"|"staged"|"all")`)
+                     Which kinds of hunks to target. Defaults to `'unstaged'`.
+        {callback} (`(fun(err: string?))?`)
 
 next_hunk({opts}, {callback})                            *hgsigns.next_hunk()*
     DEPRECATED: use |hgsigns.nav_hunk()|
@@ -396,8 +416,27 @@ next_hunk({opts}, {callback})                            *hgsigns.next_hunk()*
         {async}
 
     Parameters: ~
-        {opts}     (`any`)
-        {callback} (`any`)
+        {opts}     (`Gitsigns.NavOpts?`): Configuration options.
+                   • {wrap}: (`boolean`)
+                     Whether to loop around file or not. Defaults to the value
+                     'wrapscan'
+                   • {foldopen}: (`boolean`)
+                     Expand folds when navigating to a hunk which is inside a
+                     fold. Defaults to `true` if 'foldopen' contains `search`.
+                   • {navigation_message}: (`boolean`)
+                     Whether to show navigation messages or not. Looks at
+                     'shortmess' for default behaviour.
+                   • {greedy}: (`boolean`)
+                     Only navigate between non-contiguous hunks. Only useful if
+                     'diff_opts' contains `linematch`. Defaults to `true`.
+                   • {preview}: (`boolean?`)
+                     Automatically open preview_hunk() upon navigating to a
+                     hunk.
+                   • {count}: (`integer`)
+                     Number of times to advance. Defaults to |v:count1|.
+                   • {target}: (`("unstaged"|"staged"|"all")`)
+                     Which kinds of hunks to target. Defaults to `'unstaged'`.
+        {callback} (`(fun(err: string?))?`)
 
 nav_hunk({direction}, {opts}, {callback})                  *hgsigns.nav_hunk()*
     Jump to hunk in the current buffer. If a hunk preview

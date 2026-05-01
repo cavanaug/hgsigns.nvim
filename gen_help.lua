@@ -5,7 +5,18 @@ local inspect = vim.inspect
 local list_extend = vim.list_extend
 local startswith = vim.startswith
 
-local config = require('lua.hgsigns.config')
+local root = vim.fn.fnamemodify(debug.getinfo(1, 'S').source:sub(2), ':p:h')
+package.path = table.concat({
+  root .. '/?.lua',
+  root .. '/lua/?.lua',
+  root .. '/lua/?/init.lua',
+  package.path,
+}, ';')
+
+local emydoc = require('gen_emydoc') --- @type GenEmmyDoc
+local strip_optional = emydoc.strip_optional
+
+local config = require('hgsigns.config')
 
 local INDENT = 4
 local INDENT_STR = string.rep(' ', INDENT)
@@ -38,52 +49,20 @@ local function get_ordered_schema_keys()
   return keys
 end
 
---- @alias EmmyDocLoc { file: string, line: integer }
---- @alias EmmyDocParam { name: string, typ: string, desc: string? }
---- @alias EmmyDocReturn { name: string?, typ: string, desc: string? }
---- @alias EmmyDocModule { name: string, members: EmmyDocFn[] }
+--- @class EmmyDocTypeAttrs
+--- @field inlinedoc boolean
 
---- @class EmmyDocFn
---- @field type 'fn'
---- @field name string
---- @field description string?
---- @field deprecated boolean
---- @field deprecation_reason string?
---- @field loc EmmyDocLoc
---- @field params EmmyDocParam[]
---- @field returns EmmyDocReturn[]
+--- @param ty EmmyDocTypeClass
+--- @param tag string
+--- @return boolean
+local function has_type_tag(ty, tag)
+  for _, tag_content in ipairs(ty.tag_content or {}) do
+    if tag_content.tag_name == tag then
+      return true
+    end
+  end
 
---- @class EmmyDocTypeField
---- @field type 'field'
---- @field name string
---- @field description string?
---- @field typ string
-
---- @alias EmmyDocTypeMember EmmyDocTypeField | EmmyDocFn
-
---- @class EmmyDocTypeClass
---- @field type 'class'
---- @field name string
---- @field bases string[]?
---- @field members EmmyDocTypeMember[]
-
---- @class EmmyDocTypeAlias
---- @field type 'alias'
---- @field name string
---- @field members EmmyDocTypeMember[]
-
---- @alias EmmyDocType EmmyDocTypeClass | EmmyDocTypeAlias
-
---- @class EmmyDocJson
---- @field modules EmmyDocModule[]
---- @field types EmmyDocType[]?
-
---- @return EmmyDocJson
-local function load_emmy_doc()
-  local path = 'emydoc/doc.json'
-  local raw = vim.fn.readfile(path)
-  local json = table.concat(raw, '\n')
-  return vim.json.decode(json, { luanil = { object = true, array = true } })
+  return false
 end
 
 --- @param dep_info boolean|{new_field: string, message: string, hard: boolean}
@@ -554,8 +533,18 @@ local function get_fields(ty, classes, fields_seen)
   return ret
 end
 
---- @param name? string
---- @param classes table<string, EmmyDocTypeClass>
+--- @param name string
+--- @return string
+local function get_type_tag(name)
+  local short = name:gsub('^.-%.', ''):gsub('[^%w]', ''):lower()
+  return 'hgsigns-type-' .. short
+end
+
+--- @param name string
+--- @param classes table<string, EmmyDocTypeClass?>
+--- @param class_attrs table<string, EmmyDocTypeAttrs?>
+--- @param depth? integer
+--- @param types_seen? table<string, true>
 --- @return string[]?
 local function build_type_field_docs(name, classes)
   local t = classes[name]
@@ -676,8 +665,105 @@ local function render_block(header, desc, params, returns, deprecated)
   return res
 end
 
---- @param classes table<string, EmmyDocTypeClass>
---- @param class_name string
+--- @param header string
+--- @param desc string[]
+--- @param fields [string, string, string[]][]
+--- @return string[]
+local function render_type_block(header, desc, fields)
+  local body = {}
+
+  if #desc > 0 then
+    list_extend(
+      body,
+      indent_lines(markdown_to_vimdoc(desc), { dedent = false, tilde_block = true })
+    )
+  end
+
+  if #fields > 0 then
+    if #body > 0 and body[#body] ~= '' then
+      body[#body + 1] = ''
+    end
+
+    local fields_block = { 'Fields: ~' }
+    local name_pad = 0
+    for _, v in ipairs(fields) do
+      if #v[1] > name_pad then
+        name_pad = #v[1]
+      end
+    end
+
+    for _, v in ipairs(fields) do
+      list_extend(fields_block, render_param_or_return(v[1], v[2], v[3], name_pad))
+    end
+    list_extend(body, indent_lines(fields_block, { dedent = false }))
+  end
+
+  local res = { header }
+  list_extend(res, wrap_help_lines(body, 80))
+
+  return res
+end
+
+--- @return table<string, EmmyDocTypeClass?>
+--- @return table<string, EmmyDocTypeAttrs?>
+local function load_classes()
+  local doc = emydoc.load()
+  local classes = {} --- @type table<string, EmmyDocTypeClass?>
+  local class_attrs = {} --- @type table<string, EmmyDocTypeAttrs?>
+  for _, t in ipairs(doc.types or {}) do
+    if t.type == 'class' then
+      classes[t.name] = t
+      class_attrs[t.name] = { inlinedoc = has_type_tag(t, 'inlinedoc') }
+    end
+  end
+  return classes, class_attrs
+end
+
+--- @param type_name string
+--- @param classes table<string, EmmyDocTypeClass?>
+--- @param out table<string, true>
+--- @param order string[]
+--- @param seen table<string, true>
+local function collect_inline_doc_types(type_name, classes, class_attrs, out, order, seen)
+  type_name = strip_optional(type_name)
+  seen[type_name] = true
+
+  local class = classes[type_name]
+  if not class then
+    return
+  end
+
+  for _, field in ipairs(get_fields(class, classes)) do
+    local field_ty = strip_optional(field.typ)
+    if field_ty and classes[field_ty] then
+      if class_attrs[field_ty] and class_attrs[field_ty].inlinedoc then
+        collect_inline_doc_types(field_ty, classes, class_attrs, out, order, seen)
+      else
+        if not out[field_ty] then
+          out[field_ty] = true
+          order[#order + 1] = field_ty
+        end
+        collect_inline_doc_types(field_ty, classes, class_attrs, out, order, seen)
+      end
+    end
+  end
+end
+
+--- @param ty EmmyDocTypeClass
+--- @param classes table<string, EmmyDocTypeClass?>
+--- @return [string, string, string[]][]
+local function get_type_doc_fields(ty, classes)
+  local fields = {} --- @type [string, string, string[]][]
+  for _, m in ipairs(get_fields(ty, classes)) do
+    if m.type == 'field' and m.typ then
+      local desc = m.description and vim.split(m.description, '\n') or {}
+      fields[#fields + 1] = { m.name, m.typ, desc }
+    end
+  end
+  return fields
+end
+
+--- @param class EmmyDocTypeClass
 --- @return EmmyDocFn[]
 local function get_class_functions(classes, class_name)
   local t = classes[class_name]

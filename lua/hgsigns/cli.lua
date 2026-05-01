@@ -1,5 +1,6 @@
 local actions = require('hgsigns.actions')
 local argparse = require('hgsigns.cli.argparse')
+local cmdline = require('hgsigns.cli.context')
 local async = require('hgsigns.async')
 local attach = require('hgsigns.attach')
 local Debug = require('hgsigns.debug')
@@ -32,11 +33,11 @@ end
 local M = {}
 
 function M.complete(arglead, line)
-  local words = vim.split(line, '%s+')
-  local n = #words
+  local ctx = cmdline.parse(line)
+  local n = #ctx.words
 
   local matches = {}
-  if n == 2 then
+  if n <= ctx.subcmd_idx then
     for _, m in ipairs(sources) do
       for func, _ in pairs(m) do
         if not func:match('^[a-z]') then
@@ -46,11 +47,11 @@ function M.complete(arglead, line)
         end
       end
     end
-  elseif n > 2 then
+  elseif n > ctx.subcmd_idx then
     -- Subcommand completion
-    local cmp_func = actions._get_cmp_func(assert(words[2]))
+    local cmp_func = actions._get_cmp_func(assert(ctx.subcmd))
     if cmp_func then
-      return cmp_func(arglead)
+      return cmp_func(arglead, line)
     end
   end
   return matches
