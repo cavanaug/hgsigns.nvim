@@ -51,9 +51,29 @@ end
 --- @param arglead string
 --- @return string[]
 local function complete_heads(arglead)
-  --- @type string[]
-  local all =
-    vim.fn.systemlist({ 'git', 'rev-parse', '--symbolic', '--branches', '--tags', '--remotes' })
+  -- List hg shorthand revisions plus bookmarks, tags and branch names.
+  local hg_env = { HGPLAIN = '1', LC_ALL = 'C', LANGUAGE = 'C' }
+  local hg_base = { 'hg', '--config', 'ui.relative-paths=false' }
+
+  local function hg_list(subcmd, template)
+    local cmd = vim.list_extend(vim.deepcopy(hg_base), { subcmd, '--template', template })
+    local obj = vim.system(cmd, { text = true, env = hg_env }):wait()
+    if obj.code ~= 0 or not obj.stdout then
+      return {}
+    end
+    local lines = vim.split(obj.stdout, '\n', { plain = true, trimempty = true })
+    return lines
+  end
+
+  -- Always include hg shorthand revisions
+  local shorthands = { '.', '.^', '.~1', 'tip' }
+  local all = vim.list_extend(
+    vim.list_extend(
+      vim.list_extend(shorthands, hg_list('bookmarks', '{bookmark}\n')),
+      hg_list('tags', '{tag}\n')
+    ),
+    hg_list('branches', '{branch}\n')
+  )
   return complete_matches(arglead, all)
 end
 
