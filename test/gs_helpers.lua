@@ -370,7 +370,7 @@ end
 
 --- @param path string
 function M.edit(path)
-  helpers.api.nvim_command('edit ' .. M.fn.fnameescape(path))
+  helpers.api.nvim_command('edit! ' .. M.fn.fnameescape(path))
 end
 
 --- @param path string
