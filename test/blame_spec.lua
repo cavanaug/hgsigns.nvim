@@ -61,7 +61,7 @@ end
 local function enable_lua_treesitter_on_filetype()
   exec_lua(function()
     vim.api.nvim_create_autocmd('FileType', {
-      group = vim.api.nvim_create_augroup('gitsigns_blame_treesitter', { clear = true }),
+      group = vim.api.nvim_create_augroup('hgsigns_blame_treesitter', { clear = true }),
       pattern = 'lua',
       callback = function(args)
         pcall(vim.treesitter.start, args.buf, 'lua')
@@ -97,7 +97,7 @@ local function get_blame_panel_state()
   return exec_lua(function()
     local bufnr = vim.api.nvim_get_current_buf()
     local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-    local ns = assert(vim.api.nvim_get_namespaces().gitsigns_blame_win)
+    local ns = assert(vim.api.nvim_get_namespaces().hgsigns_blame_win)
     local marks = vim.api.nvim_buf_get_extmarks(bufnr, ns, 0, -1, { details = true })
     local row_hls = {} --- @type table<integer, string[]>
     local line_widths = {} --- @type integer[]
@@ -186,7 +186,7 @@ describe('blame', function()
   end)
 
   it('renders the default side-panel layout', function()
-    setup_gitsigns(test_config)
+    setup_hgsigns(test_config)
     setup_test_repo({
       test_file_text = { 'one', 'two' },
     })
@@ -211,7 +211,7 @@ describe('blame', function()
   it('supports string side-panel formatters', function()
     local config = vim.deepcopy(test_config)
     config.blame_formatter = '<author_time:%Y> <abbrev_sha> <summary>'
-    setup_gitsigns(config)
+    setup_hgsigns(config)
     setup_test_repo({
       test_file_text = { 'one', 'two' },
     })
@@ -233,7 +233,7 @@ describe('blame', function()
   end)
 
   it('does not let repeated summary lines widen the side panel', function()
-    setup_gitsigns(test_config)
+    setup_hgsigns(test_config)
     setup_test_repo({
       test_file_text = { 'one', 'two' },
     })
@@ -262,7 +262,7 @@ describe('blame', function()
   end)
 
   it('supports function side-panel formatters with highlights', function()
-    setup_gitsigns(test_config)
+    setup_hgsigns(test_config)
     exec_lua(function()
       require('hgsigns.config').config.blame_formatter = function(_name, info, context)
         return {
@@ -299,7 +299,7 @@ describe('blame', function()
   end)
 
   it('falls back when function side-panel formatters return strings', function()
-    setup_gitsigns(test_config)
+    setup_hgsigns(test_config)
     exec_lua(function()
       require('hgsigns.config').config.blame_formatter = function()
         return 'not chunks'
@@ -732,7 +732,7 @@ describe('blame', function()
           assert(ok and parser)
           pcall(parser.parse, parser, true)
 
-          local ns_preview = vim.api.nvim_create_namespace('gitsigns_test_blame_expected')
+          local ns_preview = vim.api.nvim_create_namespace('hgsigns_test_blame_expected')
           vim.api.nvim_buf_set_extmark(preview_buf, ns_preview, 0, 0, {
             hl_group = line_hl,
             hl_eol = true,
@@ -867,7 +867,7 @@ describe('blame', function()
         end
         local popup_buf = vim.api.nvim_win_get_buf(popup_win)
         local lines = vim.api.nvim_buf_get_lines(popup_buf, 0, -1, false)
-        local ns = assert(vim.api.nvim_get_namespaces().gitsigns_popup)
+        local ns = assert(vim.api.nvim_get_namespaces().hgsigns_popup)
         local marks = vim.api.nvim_buf_get_extmarks(popup_buf, ns, 0, -1, { details = true })
 
         local deleted_row, added_row

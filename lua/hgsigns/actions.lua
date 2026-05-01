@@ -148,13 +148,6 @@ function C.attach(args)
   })
 end
 
-function CP.attach(arglead)
-  if arglead ~= '' and vim.startswith('--force', arglead) then
-    return { '--force' }
-  end
-  return {}
-end
-
 --- Toggle [[gitsigns-config-signbooleancolumn]]
 ---
 --- @param value boolean|nil Value to set toggle. If `nil`

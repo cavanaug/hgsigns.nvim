@@ -112,6 +112,8 @@ function M.setup()
   -- Nothing to do — GitSigns* groups are not ours to create or derive.
 end
 
+M.setup_highlights = M.setup
+
 local function dprintf(fmt, ...)
   dprintf = require('hgsigns.debug.log').dprintf
   dprintf(fmt, ...)

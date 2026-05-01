@@ -12,9 +12,12 @@ local clear = helpers.clear
 local cleanup = helpers.cleanup
 local expectf = helpers.expectf
 local check = helpers.check
-local test_file --- @type string
 
 helpers.env()
+
+local function refresh_paths()
+  test_file = helpers.test_file
+end
 
 local function require_source_hls()
   if helpers.fn.has('nvim-0.12') == 0 then
@@ -449,7 +452,7 @@ describe('inline preview', function()
       )
       local diff_col = removed_regions[1][3] - 1
 
-      local ns = vim.api.nvim_create_namespace('gitsigns_test_preview')
+      local ns = vim.api.nvim_create_namespace('hgsigns_test_preview')
       local preview_buf = vim.api.nvim_create_buf(false, true)
       vim.api.nvim_buf_set_lines(preview_buf, 0, -1, false, removed)
       vim.bo[preview_buf].filetype = vim.bo.filetype
@@ -670,7 +673,7 @@ describe('popup preview', function()
         require('hgsigns').preview_hunk()
         local popup_win = assert(require('hgsigns.popup').is_open('hunk'))
         local popup_buf = vim.api.nvim_win_get_buf(popup_win)
-        local ns = vim.api.nvim_get_namespaces().gitsigns_popup
+        local ns = vim.api.nvim_get_namespaces().hgsigns_popup
         local marks = vim.api.nvim_buf_get_extmarks(popup_buf, ns, 0, -1, { details = true })
 
         local function mark_contains_hl(hl, group)
@@ -760,7 +763,7 @@ describe('popup preview', function()
           assert(ok and parser)
           pcall(parser.parse, parser, true)
 
-          local ns_preview = vim.api.nvim_create_namespace('gitsigns_test_popup_preview_expected')
+          local ns_preview = vim.api.nvim_create_namespace('hgsigns_test_popup_preview_expected')
           vim.api.nvim_buf_set_extmark(preview_buf, ns_preview, 0, 0, {
             hl_group = line_hl,
             hl_eol = true,
@@ -873,7 +876,7 @@ describe('popup preview', function()
         require('hgsigns').preview_hunk()
         local popup_win = assert(require('hgsigns.popup').is_open('hunk'))
         local popup_buf = vim.api.nvim_win_get_buf(popup_win)
-        local ns = assert(vim.api.nvim_get_namespaces().gitsigns_popup)
+        local ns = assert(vim.api.nvim_get_namespaces().hgsigns_popup)
         local marks = vim.api.nvim_buf_get_extmarks(popup_buf, ns, 0, -1, { details = true })
         vim.api.nvim_win_close(popup_win, true)
 
@@ -922,9 +925,9 @@ describe('popup preview', function()
     edit(test_file)
 
     exec_lua(function()
-      local ns = vim.api.nvim_create_namespace('gitsigns_test_popup_repeat')
+      local ns = vim.api.nvim_create_namespace('hgsigns_test_popup_repeat')
       vim.api.nvim_create_autocmd('FileType', {
-        group = vim.api.nvim_create_augroup('gitsigns_test_popup_repeat', { clear = true }),
+        group = vim.api.nvim_create_augroup('hgsigns_test_popup_repeat', { clear = true }),
         pattern = 'lua',
         callback = function(args)
           vim.schedule(function()
@@ -1000,9 +1003,9 @@ describe('popup preview', function()
     edit(test_file)
 
     exec_lua(function()
-      local ns = vim.api.nvim_create_namespace('gitsigns_test_popup_prefix')
+      local ns = vim.api.nvim_create_namespace('hgsigns_test_popup_prefix')
       vim.api.nvim_create_autocmd('FileType', {
-        group = vim.api.nvim_create_augroup('gitsigns_test_popup_prefix', { clear = true }),
+        group = vim.api.nvim_create_augroup('hgsigns_test_popup_prefix', { clear = true }),
         pattern = 'lua',
         callback = function(args)
           vim.api.nvim_buf_set_extmark(args.buf, ns, 1, 0, {
@@ -1639,9 +1642,9 @@ describe('show_deleted', function()
     edit(test_file)
 
     exec_lua(function()
-      local ns = vim.api.nvim_create_namespace('gitsigns_test_show_deleted_multi')
+      local ns = vim.api.nvim_create_namespace('hgsigns_test_show_deleted_multi')
       vim.api.nvim_create_autocmd('FileType', {
-        group = vim.api.nvim_create_augroup('gitsigns_test_show_deleted_multi', { clear = true }),
+        group = vim.api.nvim_create_augroup('hgsigns_test_show_deleted_multi', { clear = true }),
         pattern = 'lua',
         callback = function(args)
           vim.api.nvim_buf_set_extmark(args.buf, ns, 1, 0, {
@@ -1800,7 +1803,7 @@ describe('hunk preview source buffers', function()
 
         local source_cache = {} --- @type table<string, Hgsigns.HunkPreview.SourceBuf>
         local bufnr = vim.api.nvim_get_current_buf()
-        local ns = vim.api.nvim_create_namespace('gitsigns_test_source_cache')
+        local ns = vim.api.nvim_create_namespace('hgsigns_test_source_cache')
 
         local _, cleanup = HunkPreview.prepare_removed_source(bufnr, false, source_cache)
         cleanup()

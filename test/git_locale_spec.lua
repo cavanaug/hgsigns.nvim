@@ -83,7 +83,7 @@ describe('git locale', function()
     local completion_result = helpers.exec_lua(function()
       local before = #_G.hgsigns_git_envs
       local complete = require('hgsigns.actions')._get_cmp_func('show_commit')
-      local items = complete('.')
+      local items = complete('.', 'Hgsigns show_commit .')
       local calls = {}
       for i = before + 1, #_G.hgsigns_git_envs do
         calls[#calls + 1] = _G.hgsigns_git_envs[i]

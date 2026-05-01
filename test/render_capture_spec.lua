@@ -20,7 +20,7 @@ describe('render capture', function()
   it('captures overlapping extmark highlights with priority order', function()
     local text, layers, stack = exec_lua(function()
       vim.api.nvim_buf_set_lines(0, 0, -1, false, { 'abcdef' })
-      local ns = vim.api.nvim_create_namespace('gitsigns_test_capture')
+      local ns = vim.api.nvim_create_namespace('hgsigns_test_capture')
 
       vim.api.nvim_buf_set_extmark(0, ns, 0, 1, {
         end_col = 4,
@@ -78,7 +78,7 @@ describe('render capture', function()
   it('keeps hl_eol extmarks in the captured line stack', function()
     local layers, stack = exec_lua(function()
       vim.api.nvim_buf_set_lines(0, 0, -1, false, { 'foo' })
-      local ns = vim.api.nvim_create_namespace('gitsigns_test_capture_eol')
+      local ns = vim.api.nvim_create_namespace('hgsigns_test_capture_eol')
       vim.api.nvim_buf_set_extmark(0, ns, 0, 0, {
         hl_group = 'ErrorMsg',
         hl_eol = true,

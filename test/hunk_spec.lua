@@ -117,7 +117,7 @@ describe('hunksigns', function()
 
   it('does not mark no_nl_at_eof for non-eof hunks', function()
     local hunk = exec_lua(function()
-      local diff = require('gitsigns.diff_int')
+      local diff = require('hgsigns.diff_int')
       local hunks = diff.run_diff({ 'a1', 'a2', 'a3' }, { 'x1', 'x2', 'a3' }, false)
       return hunks[1]
     end)

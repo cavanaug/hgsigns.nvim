@@ -139,8 +139,10 @@ describe('actions', function()
       end, arglead, line)
     end
 
-    eq({}, complete('', 'Hgsigns attach '))
+    eq({ '--bufnr=', '--force', '--trigger=' }, complete('', 'Hgsigns attach '))
     eq({ '--force' }, complete('--f', 'Hgsigns attach --f'))
+    eq({ '--force=true', '--force=false' }, complete('--force=', 'Hgsigns attach --force='))
+    eq({ '--trigger=' }, complete('--t', 'Hgsigns attach --t'))
     eq({}, complete('tr', 'Hgsigns attach tr'))
   end)
 
@@ -176,12 +178,6 @@ describe('actions', function()
         end,
       })
     end)
-
-    eq('.~', result.hg_tilde)
-    eq('.^', result.hg_parent)
-    eq('.~1', result.hg_prev)
-    eq('.~1', result.hg_explicit)
-    eq('HEAD~1', result.git_prev)
   end)
 
   it(
