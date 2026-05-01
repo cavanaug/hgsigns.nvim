@@ -381,7 +381,7 @@ prev_hunk({opts}, {callback})                            *hgsigns.prev_hunk()*
         {async}
 
     Parameters: ~
-        {opts}     (`Gitsigns.NavOpts?`): Configuration options.
+        {opts}     (`Hgsigns.NavOpts?`): Configuration options.
                    • {wrap}: (`boolean`)
                      Whether to loop around file or not. Defaults to the value
                      'wrapscan'
@@ -416,7 +416,7 @@ next_hunk({opts}, {callback})                            *hgsigns.next_hunk()*
         {async}
 
     Parameters: ~
-        {opts}     (`Gitsigns.NavOpts?`): Configuration options.
+        {opts}     (`Hgsigns.NavOpts?`): Configuration options.
                    • {wrap}: (`boolean`)
                      Whether to loop around file or not. Defaults to the value
                      'wrapscan'
@@ -532,43 +532,23 @@ toggle_linehl({value})                               *hgsigns.toggle_linehl()*
     Returns: ~
         (`boolean`): Current value of |hgsigns-config-linehl|
 
-toggle_numhl({value})                                 *hgsigns.toggle_numhl()*
-    Toggle |hgsigns-config-numhl|
-
-    Parameters: ~
-        {value} (`boolean?`): Value to set toggle. If `nil`
-                the toggle value is inverted.
-
-    Returns: ~
-        (`boolean`): Current value of |hgsigns-config-numhl|
-
-toggle_signs({value})                                 *hgsigns.toggle_signs()*
-    Toggle |hgsigns-config-signbooleancolumn|
-
-    Parameters: ~
-        {value} (`boolean?`): Value to set toggle. If `nil`
-                the toggle value is inverted.
-
-    Returns: ~
-        (`boolean`): Current value of |hgsigns-config-signcolumn|
-
-attach({bufnr}, {ctx}, {trigger}, {callback})                    *hgsigns.attach()*
-    Attach Hgsigns to the buffer.
+attach({opts}, {callback})                                 *gitsigns.attach()*
+    Attach Gitsigns to the buffer.
 
     Attributes: ~
         {async}
 
     Parameters: ~
-        {bufnr}    (`integer`): Buffer number
-        {ctx}      (`Hgsigns.GitContext?`): • {file}: (`string`)
-                     Path to the file represented by the buffer.
-                   • {toplevel}: (`string?`)
-                     Path to the top-level of the parent git repository.
-                   • {gitdir}: (`string?`)
-                     Path to the git directory of the parent git repository.
-                   • {base}: (`string?`)
-                     Git revision to compare against.
-        {trigger}  (`string?`)
+        {opts}     (`Hgsigns.AttachOpts?`): Attach options.
+                   • {bufnr}: (`integer?`)
+                     Buffer number. Defaults to current buffer.
+                   • {ctx}: (`Hgsigns.GitContext?`)
+                     Git context for git-object buffers.
+                     See |gitsigns-type-gitcontext|.
+                   • {trigger}: (`string?`)
+                     Attach source used for logging and manual-attach checks.
+                   • {force}: (`boolean?`)
+                     Bypass auto-attach filters for this attach attempt.
         {callback} (`(fun(err: string?))?`)
 
 detach({bufnr})                                             *hgsigns.detach()*
@@ -578,8 +558,22 @@ detach({bufnr})                                             *hgsigns.detach()*
     Parameters: ~
         {bufnr} (`integer`): Buffer number
 
-detach_all()                                            *hgsigns.detach_all()*
-    Detach Hgsigns from all buffers it is attached to.
+detach_all()                                           *gitsigns.detach_all()*
+    Detach Gitsigns from all buffers it is attached to.
+
+
+==============================================================================
+TYPES                                                       *gitsigns-types*
+
+Hgsigns.GitContext                                 *gitsigns-type-gitcontext*
+
+    Fields: ~
+        {file}     (`string`): Path to the file represented by the buffer.
+        {toplevel} (`string?`): Path to the top-level of the parent git
+                                repository.
+        {gitdir}   (`string?`): Path to the git directory of the parent git
+                                repository.
+        {base}     (`string?`): Git revision to compare against.
 
 
 ==============================================================================

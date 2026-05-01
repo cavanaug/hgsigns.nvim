@@ -274,6 +274,119 @@ describe('hgsigns (with screen)', function()
       check({ status = { head = 'main' }, signs = {} })
     end)
 
+    it('requires --force to manually attach to nodiff files from the command line', function()
+      write_to_file(scratch .. '/.gitattributes', { '*.bar -diff' })
+
+      local nodiff_file = scratch .. '/dummy.bar'
+      write_to_file(nodiff_file, { 'dummy' })
+
+      git('add', scratch .. '/.gitattributes', nodiff_file)
+      git('commit', '-m', 'add nodiff file')
+
+      edit(nodiff_file)
+
+      match_debug_messages({
+        'attach.attach(1): Attaching (trigger=BufReadPost)',
+        np(revparse_pat),
+        np('attach%.attach%(1%): File has %-diff attribute'),
+      })
+
+      command('Hgsigns attach')
+
+      match_debug_messages({
+        'attach.attach(1): Attaching (trigger=BufReadPost)',
+        np(revparse_pat),
+        np('attach%.attach%(1%): File has %-diff attribute'),
+        'attach.attach(1): Attaching (trigger=command)',
+        np(revparse_pat),
+        np('attach%.attach%(1%): File has %-diff attribute'),
+      })
+
+      check({ status = { head = 'main' }, signs = {} })
+
+      command('Hgsigns attach --force')
+
+      wait_for_attach()
+      check({ status = { head = 'main', added = 0, changed = 0, removed = 0 }, signs = {} })
+    end)
+
+    it('can manually attach to nodiff files via attach({ force = true })', function()
+      write_to_file(scratch .. '/.gitattributes', { '*.bar -diff' })
+
+      local nodiff_file = scratch .. '/dummy.bar'
+      write_to_file(nodiff_file, { 'dummy' })
+
+      git('add', scratch .. '/.gitattributes', nodiff_file)
+      git('commit', '-m', 'add nodiff file')
+
+      edit(nodiff_file)
+
+      match_debug_messages({
+        'attach.attach(1): Attaching (trigger=BufReadPost)',
+        np(revparse_pat),
+        np('attach%.attach%(1%): File has %-diff attribute'),
+      })
+
+      exec_lua([[require('hgsigns').attach({ force = true })]])
+
+      wait_for_attach()
+      check({ status = { head = 'main', added = 0, changed = 0, removed = 0 }, signs = {} })
+    end)
+
+    it('can manually attach to nodiff files with force and a custom trigger', function()
+      write_to_file(scratch .. '/.gitattributes', { '*.bar -diff' })
+
+      local nodiff_file = scratch .. '/dummy.bar'
+      write_to_file(nodiff_file, { 'dummy' })
+
+      git('add', scratch .. '/.gitattributes', nodiff_file)
+      git('commit', '-m', 'add nodiff file')
+
+      edit(nodiff_file)
+
+      match_debug_messages({
+        'attach.attach(1): Attaching (trigger=BufReadPost)',
+        np(revparse_pat),
+        np('attach%.attach%(1%): File has %-diff attribute'),
+      })
+
+      exec_lua([=[
+        require('hgsigns').attach({
+          bufnr = vim.api.nvim_get_current_buf(),
+          trigger = 'test',
+          force = true,
+        })
+      ]=])
+
+      wait_for_attach()
+      check({ status = { head = 'main', added = 0, changed = 0, removed = 0 }, signs = {} })
+    end)
+
+    it('can manually attach to nodiff files with an explicit bufnr in opts', function()
+      write_to_file(scratch .. '/.gitattributes', { '*.bar -diff' })
+
+      local nodiff_file = scratch .. '/dummy.bar'
+      write_to_file(nodiff_file, { 'dummy' })
+
+      git('add', scratch .. '/.gitattributes', nodiff_file)
+      git('commit', '-m', 'add nodiff file')
+
+      edit(nodiff_file)
+
+      match_debug_messages({
+        'attach.attach(1): Attaching (trigger=BufReadPost)',
+        np(revparse_pat),
+        np('attach%.attach%(1%): File has %-diff attribute'),
+      })
+
+      exec_lua(
+        [[require('hgsigns').attach({ bufnr = vim.api.nvim_get_current_buf(), force = true })]]
+      )
+
+      wait_for_attach()
+      check({ status = { head = 'main', added = 0, changed = 0, removed = 0 }, signs = {} })
+    end)
+
     it("doesn't attach to non-existent files", function()
       edit(newfile)
 
@@ -821,7 +934,7 @@ describe('hgsigns (with screen)', function()
         })
       end)
 
-      it('can manually attach untracked files (#1026)', function()
+      it('can manually attach untracked files with --force (#1026)', function()
         config.attach_to_untracked = false
         setup_hgsigns(config)
 
@@ -834,7 +947,7 @@ describe('hgsigns (with screen)', function()
           signs = {},
         })
 
-        command('Hgsigns attach')
+        command('Hgsigns attach --force')
 
         check({
           status = { head = 'main', added = 1, changed = 0, removed = 0 },
@@ -1020,7 +1133,7 @@ describe('hgsigns (with screen)', function()
       end)
       assert(type(statuscolumn) == 'string', vim.inspect(statuscolumn))
       assert(#statuscolumn >= 2, statuscolumn)
-      eq(nil, statuscolumn:find('GitSignsStaged', 1, true))
+      eq(nil, statuscolumn:find('HgsignsStaged', 1, true))
 
       command([[lua require('hgsigns').nav_hunk('next', { navigation_message = false })]])
       expectf(function()
@@ -1296,7 +1409,13 @@ describe('hgsigns attach', function()
   local function attach_with_context(bufnr, ctx)
     exec_lua(function(bufnr0, ctx0)
       local async = require('hgsigns.async')
-      async.run(require('hgsigns.attach').attach, bufnr0, ctx0, 'test'):wait(5000)
+      async
+        .run(require('hgsigns.attach').attach, {
+          bufnr = bufnr0,
+          ctx = ctx0,
+          trigger = 'test',
+        })
+        :wait(5000)
     end, bufnr, ctx)
     wait_for_attach(bufnr)
   end

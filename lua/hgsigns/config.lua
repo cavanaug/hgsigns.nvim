@@ -1,3 +1,5 @@
+local validate = require('hgsigns.util').validate
+
 --- @class (exact) Hgsigns.SchemaElem
 --- @field type type|type[]|fun(x:any): boolean
 --- @field type_help? string
@@ -238,12 +240,12 @@ M.schema = {
         • `show_count` to enable showing count of hunk, e.g. number of deleted
           lines.
 
-      The GitSigns highlights `GitSigns[kind][type]` are used for each kind of
+      The Hgsigns highlights `HgsignsSignKindType` are used for each kind of
       sign. E.g. 'add' signs use the highlights:
-        • `GitSignsAdd`   (for normal text signs)
-        • `GitSignsAddNr` (for signs when `config.numhl == true`)
-        • `GitSignsAddLn `(for signs when `config.linehl == true`)
-        • `GitSignsAddCul `(for signs when `config.culhl == true`)
+        • `HgsignsAdd`   (for normal text signs)
+        • `HgsignsAddNr` (for signs when `config.numhl == true`)
+        • `HgsignsAddLn `(for signs when `config.linehl == true`)
+        • `HgsignsAddCul `(for signs when `config.culhl == true`)
 
       See |hgsigns-highlight-groups|.
     ]],
@@ -356,7 +358,7 @@ M.schema = {
     description = [[
       Show the old version of hunks inline in the buffer (via virtual lines).
 
-      Note: Virtual lines currently use the highlight `GitSignsDeleteVirtLn`.
+      Note: Virtual lines currently use the highlight `HgsignsDeleteVirtLn`.
     ]],
   },
 
@@ -536,7 +538,7 @@ M.schema = {
       Adds an unobtrusive and customisable blame annotation at the end of
       the current line.
 
-      The highlight group used for the text is `GitSignsCurrentLineBlame`.
+      The highlight group used for the text is `HgsignsCurrentLineBlame`.
     ]],
   },
 
@@ -715,17 +717,17 @@ M.schema = {
 
       Uses the highlights:
         • For word diff in previews:
-          • `GitSignsAddInline`
-          • `GitSignsChangeInline`
-          • `GitSignsDeleteInline`
+          • `HgsignsAddInline`
+          • `HgsignsChangeInline`
+          • `HgsignsDeleteInline`
         • For word diff in buffer:
-          • `GitSignsAddLnInline`
-          • `GitSignsChangeLnInline`
-          • `GitSignsDeleteLnInline`
+          • `HgsignsAddLnInline`
+          • `HgsignsChangeLnInline`
+          • `HgsignsDeleteLnInline`
         • For word diff in virtual lines (e.g. show_deleted):
-          • `GitSignsAddVirtLnInline`
-          • `GitSignsChangeVirtLnInline`
-          • `GitSignsDeleteVirtLnInline`
+          • `HgsignsAddVirtLnInline`
+          • `HgsignsChangeVirtLnInline`
+          • `HgsignsDeleteVirtLnInline`
     ]],
   },
 
@@ -799,20 +801,6 @@ function M.subscribe(k, cb)
   for _, v in ipairs(k) do
     subscribers[v] = subscribers[v] or {}
     table.insert(subscribers[v], cb)
-  end
-end
-
-local nvim011 = vim.fn.has('nvim-0.11') == 1
-
---- @param k string
---- @param v any
---- @param ty type|fun(v:any):boolean
-local function validate(k, v, ty)
-  if nvim011 then
-    --- @diagnostic disable-next-line: redundant-parameter,param-type-mismatch
-    vim.validate(k, v, ty)
-  else
-    vim.validate({ [k] = { v, ty, false } })
   end
 end
 

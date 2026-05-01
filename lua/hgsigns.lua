@@ -187,7 +187,7 @@ local function setup_attach()
         log().dprint('Attaching is disabled')
         return
       end
-      require('hgsigns.actions').attach(bufnr, nil, args.event)
+      require('hgsigns.actions').attach({ bufnr = bufnr, trigger = args.event })
     end,
   })
 
@@ -208,7 +208,7 @@ local function setup_attach()
       if api.nvim_buf_is_loaded(buf) and api.nvim_buf_get_name(buf) ~= '' then
         -- Make sure to run each attach in its on async context in case one of the
         -- attaches is aborted.
-        require('hgsigns.actions').attach(buf, nil, 'setup')
+        require('hgsigns.actions').attach({ bufnr = buf, trigger = 'setup' })
       end
     end
   end

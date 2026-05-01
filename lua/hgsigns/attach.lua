@@ -14,6 +14,7 @@ local dprintf = log.dprintf
 local throttle_async = require('hgsigns.debounce').throttle_async
 
 local api = vim.api
+local current_buf = api.nvim_get_current_buf
 local uv = vim.uv or vim.loop ---@diagnostic disable-line: deprecated
 
 --- @class hgsigns.attach
@@ -270,15 +271,23 @@ local function repo_update_handler(bufnr)
   require('hgsigns.manager').update(bufnr)
 end
 
+--- @param opts Hgsigns.AttachOpts?
+local function attach_hash(opts)
+  return opts and opts.bufnr or current_buf()
+end
+
 --- @async
 --- Ensure attaches cannot be interleaved for the same buffer.
 --- Since attaches are asynchronous we need to make sure an attach isn't
 --- performed whilst another one is in progress.
---- @param cbuf integer
---- @param ctx? Hgsigns.GitContext
---- @param aucmd? string
-M.attach = throttle_async({ hash = 1 }, function(cbuf, ctx, aucmd)
+--- @param opts Hgsigns.AttachOpts?
+M.attach = throttle_async({ hash = attach_hash }, function(opts)
   local __FUNC__ = 'attach'
+  local attach_opts = opts or {}
+  local cbuf = attach_opts.bufnr or current_buf()
+  local ctx = attach_opts.ctx
+  local passed_ctx = ctx ~= nil
+  local trigger = attach_opts.trigger
 
   setup()
 
@@ -287,8 +296,8 @@ M.attach = throttle_async({ hash = 1 }, function(cbuf, ctx, aucmd)
     return
   end
 
-  if aucmd then
-    dprintf('Attaching (trigger=%s)', aucmd)
+  if trigger then
+    dprintf('Attaching (trigger=%s)', trigger)
   else
     dprint('Attaching')
   end
@@ -346,9 +355,9 @@ M.attach = throttle_async({ hash = 1 }, function(cbuf, ctx, aucmd)
 
   local is_untracked = git_obj:is_untracked()
 
-  -- Manual attaches (`:Hgsigns attach`) should still be allowed for
-  -- untracked buffers.
-  if aucmd and not config.attach_to_untracked and is_untracked then
+  -- Forced attaches should still be allowed for buffers skipped by
+  -- auto-attach filters.
+  if not attach_opts.force and not config.attach_to_untracked and is_untracked then
     dprint('File is untracked')
     git_obj:close()
     return
@@ -356,7 +365,7 @@ M.attach = throttle_async({ hash = 1 }, function(cbuf, ctx, aucmd)
 
   local relpath = git_obj.relpath --[[@as string]]
   local diff_attr = git_obj.repo:check_attr('diff', { relpath })[relpath]
-  if diff_attr == 'unset' then
+  if not attach_opts.force and diff_attr == 'unset' then
     dprint('File has -diff attribute')
     git_obj:close()
     return
@@ -445,7 +454,7 @@ function M.detach(bufnr, keep_signs)
   -- updated due to the file externally changing. When this happens a detach and
   -- attach event happen in sequence and so we keep the old signs to stop the
   -- sign column width moving about between updates.
-  bufnr = bufnr or api.nvim_get_current_buf()
+  bufnr = bufnr or current_buf()
   dprint('Detached')
   local bcache = cache[bufnr]
   if not bcache then

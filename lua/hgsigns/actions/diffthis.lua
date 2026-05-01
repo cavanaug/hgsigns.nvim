@@ -51,7 +51,7 @@ local function bufread(bufnr, dbufnr, base, relpath)
   vim.bo[dbufnr].modifiable = modifiable
   vim.bo[dbufnr].modified = false
   -- TODO(lewis6991): make this blocking
-  require('hgsigns.attach').attach(dbufnr, nil, 'BufReadCmd')
+  require('hgsigns.attach').attach({ bufnr = dbufnr, trigger = 'BufReadCmd' })
 end
 
 --- @async

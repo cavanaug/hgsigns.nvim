@@ -11,6 +11,7 @@ local api = vim.api
 local current_buf = api.nvim_get_current_buf
 
 local tointeger = util.tointeger
+local validate = util.validate
 
 --- @class hgsigns.actions
 local M = {}
@@ -25,16 +26,17 @@ local M = {}
 --- @field global? boolean
 --- @field trigger? string
 --- @field force? boolean
---- @field bufnr? integer
---- @field direction? ('first'|'last'|'next'|'prev')
---- @field revision? string
---- @field open? boolean|('vsplit'|'tabnew')
---- @field target? (0|integer|'attached'|'all'|'unstaged'|'staged')
---- @field nr? (0|integer)
 --- @field [integer] any
 
 --- @class Hgsigns.CmdParams : vim.api.keyset.create_user_command.command_args
 --- @field smods Hgsigns.CmdParams.Smods
+
+--- @class (exact) Hgsigns.AttachOpts
+--- @inlinedoc
+--- @field bufnr? integer Buffer number. Defaults to current buffer.
+--- @field ctx? Hgsigns.GitContext Git context for git-object buffers.
+--- @field trigger? string Attach source used for logging and manual-attach checks.
+--- @field force? boolean Bypass auto-attach filters for this attach attempt.
 
 --- @class (exact) Hgsigns.HunkOpts
 --- Operate on/select all contiguous hunks. Only useful if 'diff_opts'
@@ -86,27 +88,71 @@ function M.detach(bufnr)
   require('hgsigns.attach').detach(bufnr)
 end
 
---- Attach Hgsigns to the buffer.
+--- @param opts_or_bufnr? Hgsigns.AttachOpts|integer
+--- @param callback_or_ctx? fun(err?: string)|Hgsigns.GitContext
+--- @param legacy_trigger? string?
+--- @param legacy_callback? fun(err?: string)
+--- @return Hgsigns.AttachOpts?
+--- @return fun(err?: string)?
+local function normalize_attach_call_args(
+  opts_or_bufnr,
+  callback_or_ctx,
+  legacy_trigger,
+  legacy_callback
+)
+  if
+    type(opts_or_bufnr) == 'table'
+    or type(callback_or_ctx) == 'function'
+    or (opts_or_bufnr == nil and callback_or_ctx == nil)
+  then
+    validate('opts', opts_or_bufnr, 'table', true)
+    validate('callback', callback_or_ctx, 'function', true)
+
+    --- @cast opts_or_bufnr Hgsigns.AttachOpts?
+    --- @cast callback_or_ctx fun(err?: string)?
+    return opts_or_bufnr, callback_or_ctx
+  else
+    validate('bufnr', opts_or_bufnr, 'number', true)
+    validate('ctx', callback_or_ctx, 'table', true)
+    validate('trigger', legacy_trigger, 'string', true)
+    validate('callback', legacy_callback, 'function', true)
+
+    --- @type Hgsigns.AttachOpts
+    local attach_opts = {
+      bufnr = opts_or_bufnr,
+      ctx = type(callback_or_ctx) == 'table' and callback_or_ctx or nil,
+      trigger = legacy_trigger,
+    }
+
+    return attach_opts, legacy_callback
+  end
+end
+
+--- Attach Gitsigns to the buffer.
 ---
 --- Attributes:
 --- - {async}
 ---
---- @param bufnr integer Buffer number
---- @param ctx Hgsigns.GitContext?
----   Git context data that may optionally be used to attach to any buffer that represents a git
----   object.
---- @param trigger? string
+--- @param opts Hgsigns.AttachOpts? Attach options.
 --- @param callback? fun(err?: string)
-function M.attach(bufnr, ctx, trigger, callback)
-  async_run(callback, require('hgsigns.attach').attach, bufnr or current_buf(), ctx, trigger)
+function M.attach(opts, callback, ...)
+  local attach_opts, actual_callback = normalize_attach_call_args(opts, callback, ...)
+  async_run(actual_callback, require('hgsigns.attach').attach, attach_opts)
 end
 
 function C.attach(args)
   M.attach({
     trigger = args.trigger or 'command',
     force = args.force,
-    bufnr = tointeger(args[1]) or args.bufnr,
+    bufnr = tointeger(args[1]),
   })
+end
+
+function CP.attach(arglead)
+  if arglead ~= '' and vim.startswith('--force', arglead) then
+    return { '--force' }
+  end
+  return {}
 end
 
 --- Toggle [[gitsigns-config-signbooleancolumn]]

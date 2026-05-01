@@ -51,7 +51,12 @@ an optional {callback} argument.
 {{FUNCTIONS}}
 
 ==============================================================================
-CONFIGURATION                                                *hgsigns-config*
+TYPES                                                       *gitsigns-types*
+
+{{TYPES}}
+
+==============================================================================
+CONFIGURATION                                                *gitsigns-config*
 
 This section describes the configuration fields which can be passed to
 |hgsigns.setup()|. Note fields of type `table` may be marked with extended
