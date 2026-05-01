@@ -58,6 +58,7 @@ with most of the default settings:
         use_focus = true,
       },
       current_line_blame_formatter = '<author>, <author_time:%R> - <summary>',
+      blame_formatter = nil, -- Use default
       sign_priority = 6,
       update_debounce = 100,
       status_formatter = nil, -- Use default
@@ -602,12 +603,12 @@ signs                                                   *hgsigns-config-signs*
       • `show_count` to enable showing count of hunk, e.g. number of deleted
         lines.
 
-    The GitSigns highlights `GitSigns[kind][type]` are used for each kind of
+    The GitSigns highlights `Hgsigns[kind][type]` are used for each kind of
     sign. E.g. 'add' signs use the highlights:
-      • `GitSignsAdd`   (for normal text signs)
-      • `GitSignsAddNr` (for signs when `config.numhl == true`)
-      • `GitSignsAddLn `(for signs when `config.linehl == true`)
-      • `GitSignsAddCul `(for signs when `config.culhl == true`)
+      • `HgsignsAdd`   (for normal text signs)
+      • `HgsignsAddNr` (for signs when `config.numhl == true`)
+      • `HgsignsAddLn `(for signs when `config.linehl == true`)
+      • `HgsignsAddCul `(for signs when `config.culhl == true`)
 
     See |hgsigns-highlight-groups|.
 
@@ -699,7 +700,7 @@ show_deleted                                     *hgsigns-config-show_deleted*
 
     Show the old version of hunks inline in the buffer (via virtual lines).
 
-    Note: Virtual lines currently use the highlight `GitSignsDeleteVirtLn`.
+    Note: Virtual lines currently use the highlight `HgsignsDeleteVirtLn`.
 
 diff_opts                                           *hgsigns-config-diff_opts*
     Type: `table[extended]`, Default: derived from 'diffopt'
@@ -819,7 +820,7 @@ current_line_blame                         *hgsigns-config-current_line_blame*
     Adds an unobtrusive and customisable blame annotation at the end of
     the current line.
 
-    The highlight group used for the text is `GitSignsCurrentLineBlame`.
+    The highlight group used for the text is `HgsignsCurrentLineBlame`.
 
 current_line_blame_opts               *hgsigns-config-current_line_blame_opts*
     Type: `table[extended]`
@@ -936,7 +937,40 @@ current_line_blame_formatter_nc *hgsigns-config-current_line_blame_formatter_nc*
     String or function used to format the virtual text of
     |hgsigns-config-current_line_blame| for lines that aren't committed.
 
-    See |hgsigns-config-current_line_blame_formatter| for more information.
+    See |gitsigns-config-current_line_blame_formatter| for more information.
+
+blame_formatter                              *gitsigns-config-blame_formatter*
+    Type: `string|function`, Default: nil (use built-in layout)
+
+    String or function used to format commit header lines in the
+    `:Hgsigns blame` side panel.
+
+    When `nil`, the built-in blame side-panel layout is used.
+
+    When a string, accepts the same format specifiers as
+    |gitsigns-config-current_line_blame_formatter|. If the string contains
+    `<summary>`, the repeated summary line is suppressed.
+
+    When a function:
+      Parameters: ~
+        {name}       Git user name returned from `git config user.name`.
+        {blame_info} Table with the same keys as
+                     |gitsigns-config-current_line_blame_formatter|.
+        {context}    Table with:
+                       • `max_author_width`: integer
+                       • `hash_hl_group`: string
+
+      Return: ~
+        First return:
+          • a list of `[text, highlight]` chunks
+
+        Second return:
+          • `boolean?`
+
+        Returning `false` as the second value suppresses the repeated summary
+        line for subsequent lines in the same commit block.
+
+    The blame graph glyphs and heatmap remain renderer-controlled.
 
 trouble                                               *hgsigns-config-trouble*
     Type: `boolean`, Default: true if installed
@@ -952,17 +986,17 @@ word_diff                                           *hgsigns-config-word_diff*
 
     Uses the highlights:
       • For word diff in previews:
-        • `GitSignsAddInline`
-        • `GitSignsChangeInline`
-        • `GitSignsDeleteInline`
+        • `HgsignsAddInline`
+        • `HgsignsChangeInline`
+        • `HgsignsDeleteInline`
       • For word diff in buffer:
-        • `GitSignsAddLnInline`
-        • `GitSignsChangeLnInline`
-        • `GitSignsDeleteLnInline`
+        • `HgsignsAddLnInline`
+        • `HgsignsChangeLnInline`
+        • `HgsignsDeleteLnInline`
       • For word diff in virtual lines (e.g. show_deleted):
-        • `GitSignsAddVirtLnInline`
-        • `GitSignsChangeVirtLnInline`
-        • `GitSignsDeleteVirtLnInline`
+        • `HgsignsAddVirtLnInline`
+        • `HgsignsChangeVirtLnInline`
+        • `HgsignsDeleteVirtLnInline`
 
 debug_mode                                         *hgsigns-config-debug_mode*
     Type: `boolean`, Default: `false`

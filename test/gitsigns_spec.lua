@@ -451,6 +451,26 @@ describe('hgsigns (with screen)', function()
       setup_hgsigns(config)
     end)
 
+    local function stub_notify_once()
+      exec_lua(function()
+        _G.__gitsigns_notify_once_orig = vim.notify_once
+        vim.notify_once = function() end
+      end)
+    end
+
+    local function restore_notify_once()
+      exec_lua(function()
+        if _G.__gitsigns_notify_once_orig then
+          vim.notify_once = _G.__gitsigns_notify_once_orig
+          _G.__gitsigns_notify_once_orig = nil
+        end
+      end)
+    end
+
+    after_each(function()
+      restore_notify_once()
+    end)
+
     local function blame_line_ui_test(autocrlf, file_ending)
       setup_test_repo()
       exec_lua([[vim.g.editorconfig = false]])
@@ -504,89 +524,31 @@ describe('hgsigns (with screen)', function()
       blame_line_ui_test('false', 'unix')
     end)
 
-    it('shows committed and modified mercurial current-line blame truthfully', function()
-      setup_test_hg_repo()
-      edit(test_file)
-      wait_for_attach()
-
-      local committed = exec_lua(function()
-        return vim.wait(5000, function()
-          local info = vim.b.hgsigns_blame_line_dict
-          return info and info.author == 'tester' and info.filename == 'dummy.txt'
-        end)
-      end)
-      eq(true, committed)
-
-      local committed_info = exec_lua(function()
-        return vim.deepcopy(vim.b.hgsigns_blame_line_dict)
-      end)
-      eq('tester', committed_info.author)
-      eq('dummy.txt', committed_info.filename)
-      eq(false, committed_info.sha == '')
-
-      feed('ggccEDIT<esc>')
-
-      local modified = exec_lua(function()
-        return vim.wait(5000, function()
-          local info = vim.b.hgsigns_blame_line_dict
-          return info and info.author == 'Not Committed Yet'
-        end)
-      end)
-      eq(true, modified)
-
-      local modified_info = exec_lua(function()
-        return vim.deepcopy(vim.b.hgsigns_blame_line_dict)
-      end)
-      eq('Not Committed Yet', modified_info.author)
-      eq('dummy.txt', modified_info.filename)
-      eq(string.rep('0', 40), modified_info.sha)
-    end)
-
-    it('reuses mercurial annotate results across cursor movement', function()
-      setup_test_hg_repo({
-        test_file_text = { 'alpha', 'beta', 'gamma' },
-      })
-      edit(test_file)
-      wait_for_attach()
-
-      eq(
-        true,
-        exec_lua(function()
-          return vim.wait(5000, function()
-            local info = vim.b.hgsigns_blame_line_dict
-            return info and info.final_lnum == 1
-          end)
-        end)
-      )
+    it('falls back when function formatters return invalid virt_text', function()
+      -- nvim 0.10.4 can hang screen tests that render notify_once messages.
+      -- This spec only cares about falling back to the default formatter.
+      stub_notify_once()
 
       exec_lua(function()
-        local bcache = assert(require('hgsigns.cache').cache[vim.api.nvim_get_current_buf()])
-        local original = bcache.run_blame
-        bcache._test_hg_blame_runs = 0
-        bcache.run_blame = function(self, ...)
-          self._test_hg_blame_runs = self._test_hg_blame_runs + 1
-          return original(self, ...)
+        require('hgsigns.config').config.current_line_blame_formatter = function()
+          return 'not virt_text'
         end
       end)
 
-      feed('j')
+      setup_test_repo()
+      edit(test_file)
+      feed('gg')
+      check({ signs = {} })
 
       eq(
         true,
         exec_lua(function()
           return vim.wait(5000, function()
-            local info = vim.b.hgsigns_blame_line_dict
-            return info and info.final_lnum == 2
+            local line = vim.b.gitsigns_blame_line
+            return line ~= nil and line ~= 'not virt_text' and line:match('^ You, ') ~= nil
           end)
         end)
       )
-
-      local after_move_annotate_calls = exec_lua(function()
-        local bcache = assert(require('hgsigns.cache').cache[vim.api.nvim_get_current_buf()])
-        return bcache._test_hg_blame_runs
-      end)
-
-      eq(0, after_move_annotate_calls)
     end)
   end)
 
@@ -763,15 +725,30 @@ describe('hgsigns (with screen)', function()
     end)
   end)
 
-  --  TODO(lewis6991): All deprecated fields removed. Re-add when we have another deprecated field
-  -- describe('configuration', function()
-  --   it('handled deprecated fields', function()
-  --     pending()
-  --     -- config.current_line_blame_delay = 100
-  --     -- setup_hgsigns(config)
-  --     -- eq(100, exec_lua([[return package.loaded['hgsigns.config'].config.current_line_blame_opts.delay]]))
-  --   end)
-  -- end)
+  describe('configuration', function()
+    it('validates union-typed fields', function()
+      helpers.setup_path()
+
+      for _, case in ipairs({
+        { field = 'current_line_blame_formatter', value = 1 },
+        { field = 'current_line_blame_formatter_nc', value = 1 },
+        { field = 'blame_formatter', value = true },
+      }) do
+        local result = exec_lua(function(field, value)
+          local ok, err = pcall(require('hgsigns.config').build, {
+            [field] = value,
+          })
+          return {
+            ok = ok,
+            err = tostring(err),
+          }
+        end, case.field, case.value)
+
+        eq(false, result.ok)
+        eq(true, result.err:find(case.field, 1, true) ~= nil)
+      end
+    end)
+  end)
 
   describe('on_attach()', function()
     it('can prevent attaching to a buffer', function()

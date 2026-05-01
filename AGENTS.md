@@ -21,10 +21,10 @@ Every runtime identifier follows a single lowercase name:
 | gitsigns (upstream)              | hgsigns (this fork)              |
 |----------------------------------|----------------------------------|
 | `lua/gitsigns/`                  | `lua/hgsigns/`                   |
-| `require('gitsigns')`            | `require('hgsigns')`             |
-| `:Gitsigns <action>`             | `:Hgsigns <action>`              |
-| Highlight group `GitSigns*`      | `Hgsigns*`                       |
-| Buffer variable `b:gitsigns_*`   | `b:hgsigns_*`                    |
+| `require('hgsigns')`            | `require('hgsigns')`             |
+| `:Hgsigns <action>`             | `:Hgsigns <action>`              |
+| Highlight group `Hgsigns*`      | `Hgsigns*`                       |
+| Buffer variable `b:hgsigns_*`   | `b:hgsigns_*`                    |
 | Autocommand `User GitsignsUpdate`| `User HgsignsUpdate`             |
 
 ## Build, Test, and Development Commands
@@ -50,9 +50,6 @@ Every runtime identifier follows a single lowercase name:
 ## Testing Guidelines
 
 - Add or update tests for risky, non-obvious, or broad changes; see `etc/testing.md` for details.
-- Test helpers for Mercurial: `hg_init_scratch()`, `setup_test_hg_repo()`, `hg(...)` in
-  `test/gs_helpers.lua` — replace upstream `git()`/`setup_git_repo()` calls with these.
-- Do not run multiple `make test` invocations in parallel against the same checkout. The functional tests share `scratch/` state via `test/gs_helpers.lua`, so parallel runs can interfere unless each run gets an isolated workspace/scratch path.
 
 ## Commit & Pull Request Guidelines
 

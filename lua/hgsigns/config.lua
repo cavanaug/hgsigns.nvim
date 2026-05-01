@@ -40,7 +40,22 @@ local validate = require('hgsigns.util').validate
 --- | 'changedelete'
 --- | 'untracked'
 
---- @alias Hgsigns.CurrentLineBlameFmtFun fun(user: string, info: table<string,any>): [string,string][]
+--- @alias Hgsigns.CurrentLineBlameFmtFun fun(
+---   user: string,
+---   info: table<string,any>
+--- ): Hgsigns.BlameFmtChunk[]
+
+--- @alias Hgsigns.BlameFmtChunk [string, Hgsigns.HlName|Hgsigns.HlStack?]
+
+--- @class (exact) Hgsigns.BlameFormatterContext
+--- @field max_author_width integer
+--- @field hash_hl_group string
+
+--- @alias Hgsigns.BlameFormatterFun fun(
+---   user: string,
+---   info: Hgsigns.BlameInfoPublic,
+---   context: Hgsigns.BlameFormatterContext
+--- ): Hgsigns.BlameFmtChunk[], boolean?
 
 --- @class (exact) Hgsigns.CurrentLineBlameOpts : Hgsigns.BlameOpts
 --- @field virt_text? boolean
@@ -78,6 +93,7 @@ local validate = require('hgsigns.util').validate
 --- @field current_line_blame_formatter string|Hgsigns.CurrentLineBlameFmtFun
 --- @field current_line_blame_formatter_nc string|Hgsigns.CurrentLineBlameFmtFun
 --- @field current_line_blame_opts Hgsigns.CurrentLineBlameOpts
+--- @field blame_formatter? string|Hgsigns.BlameFormatterFun
 --- @field preview_config vim.api.keyset.win_config
 --- @field auto_attach boolean
 --- @field attach_to_untracked boolean
@@ -667,6 +683,43 @@ M.schema = {
     ]],
   },
 
+  blame_formatter = {
+    type = { 'string', 'function' },
+    default = nil,
+    default_help = 'nil (use built-in layout)',
+    description = [[
+      String or function used to format commit header lines in the
+      `:Hgsigns blame` side panel.
+
+      When `nil`, the built-in blame side-panel layout is used.
+
+      When a string, accepts the same format specifiers as
+      |gitsigns-config-current_line_blame_formatter|. If the string contains
+      `<summary>`, the repeated summary line is suppressed.
+
+      When a function:
+        Parameters: ~
+          {name}       Git user name returned from `git config user.name`.
+          {blame_info} Table with the same keys as
+                       |gitsigns-config-current_line_blame_formatter|.
+          {context}    Table with:
+                         • `max_author_width`: integer
+                         • `hash_hl_group`: string
+
+        Return: ~
+          First return:
+            • a list of `[text, highlight]` chunks
+
+          Second return:
+            • `boolean?`
+
+          Returning `false` as the second value suppresses the repeated summary
+          line for subsequent lines in the same commit block.
+
+      The blame graph glyphs and heatmap remain renderer-controlled.
+    ]],
+  },
+
   trouble = {
     type = 'boolean',
     default = function()
@@ -817,7 +870,7 @@ function M.build(user_config)
       warn("hgsigns: Ignoring invalid configuration field '%s'", k)
     else
       local ty = s.type
-      if type(ty) == 'string' or type(ty) == 'function' then
+      if type(ty) == 'string' or type(ty) == 'table' or type(ty) == 'function' then
         --- EmmyLuaLs/emmylua-analyzer-rust#696
         --- @diagnostic disable-next-line: param-type-not-match, param-type-mismatch
         validate(k, v, ty)
