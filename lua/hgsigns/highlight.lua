@@ -86,7 +86,7 @@ vim.list_extend(M.hls, {
   { HgsignsAddPreview = { desc = 'Used for added lines in previews.' } },
   { HgsignsDeletePreview = { desc = 'Used for deleted lines in previews.' } },
   { HgsignsNoEOLPreview = { desc = 'Used for "No newline at end of file".' } },
-  { HgsignsCurrentLineBlame = { desc = 'Used for current line blame.' } },
+  { HgsignsCurrentLineBlame = { 'NonText', desc = 'Used for current line blame.' } },
   { HgsignsAddInline = { desc = 'Used for added word diff regions in inline previews.' } },
   { HgsignsDeleteInline = { desc = 'Used for deleted word diff regions in inline previews.' } },
   { HgsignsChangeInline = { desc = 'Used for changed word diff regions in inline previews.' } },
