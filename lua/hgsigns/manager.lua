@@ -230,9 +230,9 @@ local function apply_word_diff(bufnr, row)
       ecol = scol + 1
     end
 
-    local hl_group = rtype == 'add' and 'GitSignsAddLnInline'
-      or rtype == 'change' and 'GitSignsChangeLnInline'
-      or 'GitSignsDeleteLnInline'
+    local hl_group = rtype == 'add' and 'HgsignsAddLnInline'
+      or rtype == 'change' and 'HgsignsChangeLnInline'
+      or 'HgsignsDeleteLnInline'
 
     local opts = {
       ephemeral = true,

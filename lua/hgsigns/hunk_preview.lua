@@ -16,11 +16,11 @@ local NO_NL_TEXT = '\\ No newline at end of file'
 local preview_hls = {
   removed = {
     prefix = '-',
-    line = 'GitSignsDeletePreview',
+    line = 'HgsignsDeletePreview',
   },
   added = {
     prefix = '+',
-    line = 'GitSignsAddPreview',
+    line = 'HgsignsAddPreview',
   },
 }
 
@@ -269,7 +269,7 @@ local function render_popup_lines(lines, opts)
           {
             start_row = 0,
             end_row = 1,
-            hl_group = 'GitSignsNoEOLPreview',
+            hl_group = 'HgsignsNoEOLPreview',
           },
         },
       },
@@ -292,10 +292,10 @@ local function capture_popup_lines(_bufnr, kind, source_bufnr, node, removed, ad
     nil,
     config.diff_opts.internal and word_diff_regions(removed, added, kind) or nil,
     function(region_type)
-      return kind == 'removed' and 'GitSignsDeleteInline'
-        or region_type == 'add' and 'GitSignsAddInline'
-        or region_type == 'change' and 'GitSignsChangeInline'
-        or 'GitSignsDeleteInline'
+      return kind == 'removed' and 'HgsignsDeleteInline'
+        or region_type == 'add' and 'HgsignsAddInline'
+        or region_type == 'change' and 'HgsignsChangeInline'
+        or 'HgsignsDeleteInline'
     end
   )
 

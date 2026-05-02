@@ -604,8 +604,8 @@ function M.linespec_for_hunk(hunk, fileformat)
   end
 
   for _, spec in ipairs({
-    { sym = '-', lines = removed, hl = 'GitSignsDeletePreview' },
-    { sym = '+', lines = added, hl = 'GitSignsAddPreview' },
+    { sym = '-', lines = removed, hl = 'HgsignsDeletePreview' },
+    { sym = '+', lines = added, hl = 'HgsignsAddPreview' },
   }) do
     for _, l in ipairs(spec.lines) do
       --- @type Hgsigns.HlMark
@@ -626,7 +626,7 @@ function M.linespec_for_hunk(hunk, fileformat)
       local hlm = assert(assert(hls[i])[1])[2]
       hlm[#hlm + 1] = {
         start_row = 0,
-        hl_group = 'GitSignsDeleteInline',
+        hl_group = 'HgsignsDeleteInline',
         start_col = region[3],
         end_col = region[4],
       }
@@ -637,7 +637,7 @@ function M.linespec_for_hunk(hunk, fileformat)
       local hlm = assert(assert(hls[i])[1])[2]
       hlm[#hlm + 1] = {
         start_row = 0,
-        hl_group = 'GitSignsAddInline',
+        hl_group = 'HgsignsAddInline',
         start_col = region[3],
         end_col = region[4],
       }
@@ -650,7 +650,7 @@ function M.linespec_for_hunk(hunk, fileformat)
       no_nl_at_eof = hunk.removed.count + hunk.added.count + 1
     end
     if no_nl_at_eof then
-      local mark = { start_row = 0, end_row = 1, hl_group = 'GitSignsNoEOLPreview' }
+      local mark = { start_row = 0, end_row = 1, hl_group = 'HgsignsNoEOLPreview' }
       table.insert(hls, no_nl_at_eof, { { '\\ No newline at end of file', { mark } } })
     end
   end

@@ -74,7 +74,7 @@ local function show_added(bufnr, nsw, hunk)
     local row = start_row + offset
     api.nvim_buf_set_extmark(bufnr, nsw, row, 0, {
       end_row = row + 1,
-      hl_group = 'GitSignsAddPreview',
+      hl_group = 'HgsignsAddPreview',
       hl_eol = true,
       priority = 1000,
     })
@@ -93,9 +93,9 @@ local function show_added(bufnr, nsw, hunk)
     api.nvim_buf_set_extmark(bufnr, nsw, start_row + offset, scol, {
       end_col = ecol,
       strict = not cr_at_eol_change,
-      hl_group = rtype == 'add' and 'GitSignsAddInline'
-        or rtype == 'change' and 'GitSignsChangeInline'
-        or 'GitSignsDeleteInline',
+      hl_group = rtype == 'add' and 'HgsignsAddInline'
+        or rtype == 'change' and 'HgsignsChangeInline'
+        or 'HgsignsDeleteInline',
       priority = 1001,
     })
   end
