@@ -417,7 +417,7 @@ describe('blame', function()
             return path
           end,
           command = function(_, argv, _)
-            captured_args = vim.deepcopy(argv)
+            captured_args = captured_args or vim.deepcopy(argv)
             return vim.split(encoded, '\n', { plain = true }), nil, 0
           end,
         },
@@ -680,7 +680,7 @@ describe('blame', function()
   it('reuses source highlight stacks in the full blame popup hunk', function()
     require_source_hls()
 
-    setup_test_repo({
+    setup_test_hg_repo({
       test_file_text = {
         'local foo = 1',
       },
@@ -689,8 +689,8 @@ describe('blame', function()
     helpers.write_to_file(test_file, {
       'local bar = 1',
     })
-    helpers.git('add', test_file)
-    helpers.git('commit', '-m', 'rename foo')
+    helpers.hg('add', test_file)
+    helpers.hg('commit', '-m', 'rename foo', '-u', 'tester')
 
     local config = vim.deepcopy(test_config)
     config.gh = true
@@ -699,13 +699,11 @@ describe('blame', function()
     enable_lua_treesitter_on_filetype()
 
     check({
-      status = { head = 'main', added = 0, changed = 0, removed = 0 },
+      status = { head = 'default', added = 0, changed = 0, removed = 0 },
       signs = {},
     })
 
     exec_lua(function()
-      local async = require('hgsigns.async')
-
       package.loaded['hgsigns.gh'] = {
         commit_url = function()
           return 'https://example.test/commit'
@@ -714,9 +712,21 @@ describe('blame', function()
           return { { '#1 ', 'Title', 'https://example.test/pr/1' } }
         end,
       }
-
-      async.run(require('hgsigns.actions.blame_line'), { full = true }):wait()
     end)
+
+    exec_lua(function()
+      local async = require('hgsigns.async')
+      async.run(require('hgsigns.actions.blame_line'), { full = true }):raise_on_error()
+    end)
+
+    eq(
+      true,
+      exec_lua(function()
+        return vim.wait(5000, function()
+          return require('hgsigns.popup').is_open('blame') ~= nil
+        end)
+      end)
+    )
 
     expectf(function()
       local result = exec_lua(function()
@@ -822,7 +832,7 @@ describe('blame', function()
   end)
 
   it('extends full blame popup line highlights to the end of the line', function()
-    setup_test_repo({
+    setup_test_hg_repo({
       test_file_text = {
         'local foo = 1',
       },
@@ -831,21 +841,19 @@ describe('blame', function()
     helpers.write_to_file(test_file, {
       'local bar = 1',
     })
-    helpers.git('add', test_file)
-    helpers.git('commit', '-m', 'rename foo')
+    helpers.hg('add', test_file)
+    helpers.hg('commit', '-m', 'rename foo', '-u', 'tester')
 
     local config = vim.deepcopy(test_config)
     config.gh = true
     setup_hgsigns(config)
     edit(test_file)
     check({
-      status = { head = 'main', added = 0, changed = 0, removed = 0 },
+      status = { head = 'default', added = 0, changed = 0, removed = 0 },
       signs = {},
     })
 
     exec_lua(function()
-      local async = require('hgsigns.async')
-
       package.loaded['hgsigns.gh'] = {
         commit_url = function()
           return 'https://example.test/commit'
@@ -854,9 +862,21 @@ describe('blame', function()
           return { { '#1 ', 'Title', 'https://example.test/pr/1' } }
         end,
       }
-
-      async.run(require('hgsigns.actions.blame_line'), { full = true }):wait()
     end)
+
+    exec_lua(function()
+      local async = require('hgsigns.async')
+      async.run(require('hgsigns.actions.blame_line'), { full = true }):raise_on_error()
+    end)
+
+    eq(
+      true,
+      exec_lua(function()
+        return vim.wait(5000, function()
+          return require('hgsigns.popup').is_open('blame') ~= nil
+        end)
+      end)
+    )
 
     local result
     expectf(function()
