@@ -173,6 +173,10 @@ local function create_blame_title_linespec(result, repo, with_gh)
     title[#title] = { result.abbrev_sha, 'Directory', commit_url }
   end
 
+  if gh then
+    vim.list_extend(title, gh.create_pr_linespec(result.sha, repo.toplevel))
+  end
+
   vim.list_extend(title, {
     { result.author .. ' ', 'MoreMsg' },
     { util.expand_format('(<author_time:%Y-%m-%d %H:%M>)', result), 'Label' },
