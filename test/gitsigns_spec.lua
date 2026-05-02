@@ -544,7 +544,7 @@ describe('hgsigns (with screen)', function()
         true,
         exec_lua(function()
           return vim.wait(5000, function()
-            local line = vim.b.gitsigns_blame_line
+            local line = vim.b.hgsigns_blame_line
             return line ~= nil and line ~= 'not virt_text' and line:match('^ You, ') ~= nil
           end)
         end)
