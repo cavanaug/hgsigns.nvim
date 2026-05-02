@@ -198,6 +198,10 @@ end
 --- @param bufnr integer
 --- @return boolean
 function M.has_preview_inline(bufnr)
+  if bufnr == nil or bufnr == 0 then
+    bufnr = api.nvim_get_current_buf()
+  end
+
   if inline_bufnr ~= bufnr then
     return false
   end
