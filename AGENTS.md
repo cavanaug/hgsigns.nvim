@@ -82,6 +82,9 @@ git diff HEAD upstream/main
 
 ### Cherry-Picking a Single Upstream Fix or Feature
 
+**One commit at a time, tests green before moving on.**  Never stage or apply
+multiple upstream commits together; each must be individually verified.
+
 Follow the checklist in `PORTING.md` §7.  Quick summary:
 
 1. `git cherry-pick -n -x <sha>` — stage without committing (`-x` records the upstream SHA in the commit message).
@@ -91,18 +94,32 @@ Follow the checklist in `PORTING.md` §7.  Quick summary:
 4. Translate new `git` CLI calls to their `hg` equivalents; see `PORTING.md` §3.
 5. Wrap new `hg` calls in the stabilization env (`HGPLAIN=1`, `LC_ALL=C`,
    `--config ui.relative-paths=false`); see `PORTING.md` §5.
-6. Run `make test` and `make format-check`.
-7. Commit with a message referencing the upstream SHA:
+6. Run `make format-check` — fix any style violations.
+7. Run `make test` — **all tests must pass** (no new failures vs the pre-cherry-pick baseline).
+   If a test fails, fix the code now before proceeding.
+8. Commit with a message referencing the upstream SHA:
    `git commit -m "port: <subject> (upstream <short-sha>)"`
+9. Update `UPSTREAM-CHERRYPICKS.md` — mark the row `ported` (or `partial` with a note).
+10. Only then move on to the next upstream commit.
 
-### Porting a Batch of Upstream Commits
+### Porting Multiple Upstream Commits
+
+Process them **one at a time** in chronological order.  Do not batch-apply a
+range with `git cherry-pick <range>` — doing so makes it impossible to isolate
+which commit broke a test.
 
 ```bash
 git fetch upstream
-# cherry-pick a range onto the mercurial branch
-git cherry-pick -n <oldest-sha>^..<newest-sha>
-# resolve conflicts, apply rename map, drop removed subsystems
-make test && make format-check
+# List commits oldest-first
+git log --reverse HEAD..upstream/main --oneline
+
+# For each sha in that list, repeat the single-commit workflow above:
+git cherry-pick -n -x <sha>
+# … apply rename map, drop removed subsystems, translate hg calls …
+make format-check
+make test          # must be clean before committing
+git commit -m "port: <subject> (upstream <sha>)"
+# update UPSTREAM-CHERRYPICKS.md, then continue to the next sha
 ```
 
 ### Keeping the Upstream Mirror Branch Current

@@ -158,6 +158,8 @@ need changes.
 
 ## 7. Quick Cherry-Pick Checklist
 
+**One commit at a time, tests green before moving on.**
+
 1. Apply the upstream commit with `git cherry-pick -n -x <sha>`.
 2. Run `grep -r 'gitsigns\|Gitsigns\|GitSigns' lua/ plugin/ test/` — fix any
    un-renamed identifiers (use the rename map in section 2).
@@ -165,11 +167,15 @@ need changes.
    4.  Drop those hunks.
 4. Check whether the diff adds new `git` CLI calls.  Translate them using
    section 3 and wrap them in the stabilization env from section 5.
-5. Run `make test` and `make format-check` to verify.
-6. Commit with a message referencing the upstream SHA:
+5. Run `make format-check` — fix any style violations before proceeding.
+6. Run `make test` — **all tests must pass** (no new failures vs the
+   pre-cherry-pick baseline).  If a test fails, fix the code now; do not
+   move on to the next commit until the suite is clean.
+7. Commit with a message referencing the upstream SHA:
    `git commit -m "port: <subject> (upstream <short-sha>)"`
-7. Update `UPSTREAM-CHERRYPICKS.md` — change the row status from `pending` to
+8. Update `UPSTREAM-CHERRYPICKS.md` — change the row status from `pending` to
    `ported` (or `partial` with a note if you modified or dropped hunks).
+9. Only then move on to the next upstream commit.
 
 ---
 
@@ -190,4 +196,6 @@ git log HEAD..upstream/main --oneline
 ```
 
 When evaluating a new batch, add a dated section to `UPSTREAM-CHERRYPICKS.md`
-with every commit's status and notes before starting work.
+with every commit's status and notes **before** starting work.  Then work
+through the list strictly one commit at a time — run `make test` after each
+cherry-pick and commit only when the suite is clean.
