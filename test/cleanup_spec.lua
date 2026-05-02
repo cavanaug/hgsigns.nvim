@@ -48,7 +48,6 @@ describe('cleanup', function()
     config.signs_staged = { add = { text = '!' } }
     config.signs_staged_enable = false
     config.worktrees = { { toplevel = '/tmp/example', gitdir = '/tmp/example/.git' } }
-    config.gh = true
 
     helpers.setup_path()
     exec_lua(function(config0)
@@ -73,7 +72,6 @@ describe('cleanup', function()
         signs_staged_enable = require('hgsigns.config').config.signs_staged_enable,
         worktrees = require('hgsigns.config').config.worktrees,
         on_attach_pre = require('hgsigns.config').config._on_attach_pre,
-        gh = require('hgsigns.config').config.gh,
       }
     end)
 
@@ -81,14 +79,12 @@ describe('cleanup', function()
     eq(nil, result.signs_staged_enable)
     eq(nil, result.worktrees)
     eq(nil, result.on_attach_pre)
-    eq(nil, result.gh)
 
     for _, key in ipairs({
       'signs_staged',
       'signs_staged_enable',
       'worktrees',
       '_on_attach_pre',
-      'gh',
     }) do
       assert(
         result.messages:find(("Ignoring invalid configuration field '%s'"):format(key), 1, true),
