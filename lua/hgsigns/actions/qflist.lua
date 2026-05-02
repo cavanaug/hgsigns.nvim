@@ -80,9 +80,22 @@ local function buildqflist(target)
       end
       local diff_attrs = r:check_attr('diff', changed_paths)
 
+      -- For hg renames, the R entry (old path) is the source of an A entry
+      -- (new path with oldpath set).  Skip the R entry to avoid double-counting.
+      local renamed_away = {} --- @type table<string, true>
+      if r.vcs == 'hg' then
+        for _, cf in ipairs(changed_files) do
+          if cf.oldpath then
+            renamed_away[cf.oldpath] = true
+          end
+        end
+      end
+
       for _, changed_file in ipairs(changed_files) do
         local f = changed_file.path
-        if diff_attrs[f] ~= 'unset' then
+        if renamed_away[f] then
+          -- Skip: this path was renamed away; the A entry covers the diff.
+        elseif diff_attrs[f] ~= 'unset' then
           local f_abs = r.toplevel .. '/' .. f
           local stat = uv.fs_stat(f_abs)
           if changed_file.deleted or (stat and stat.type == 'file') then
