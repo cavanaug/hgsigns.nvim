@@ -42,9 +42,32 @@ local function gen_hl(kind, ty)
     what = 'the text'
   end
 
+  local fallbacks --- @type string[]
+  if ty == 'changedelete' then
+    fallbacks = { 'Hgsigns' .. capitalise('change') .. kind }
+  elseif ty == 'topdelete' then
+    fallbacks = { 'Hgsigns' .. capitalise('delete') .. kind }
+  elseif ty == 'untracked' then
+    fallbacks = { 'Hgsigns' .. capitalise('add') .. kind }
+  elseif kind == 'Nr' or kind == 'Cul' then
+    fallbacks = { ('Hgsigns%s'):format(cty) }
+  elseif kind == 'Ln' then
+    fallbacks = { ('Diff%s'):format(cty) }
+  else
+    -- base sign hl: fall back to nvim built-in diff groups
+    fallbacks = {
+      ty == 'add' and 'Added'
+        or ty == 'delete' and 'Removed'
+        or ty == 'change' and 'Changed'
+        or '???',
+      ('Diff%s'):format(cty),
+    }
+  end
+
   --- @type Hgsigns.Hldef
   local spec = {
     desc = ("Used for %s of '%s' signs."):format(what, ty),
+    unpack(fallbacks),
   }
 
   return hl, spec
@@ -115,10 +138,16 @@ local function derive(hl, hldef, is_bg_light)
   if type(fallbacks[1]) == 'string' then
     for _, fb in ipairs(fallbacks) do
       if is_hl_set(fb) then
-        api.nvim_set_hl(0, hl, { link = fb })
+        api.nvim_set_hl(0, hl, { default = true, link = fb })
         dprintf('Derived %s from %s', hl, fb)
         return
       end
+    end
+    -- No fallback is set yet; link to first anyway so colorscheme can fill it in
+    if fallbacks[1] and not hldef.fg_factor then
+      api.nvim_set_hl(0, hl, { default = true, link = fallbacks[1] })
+      dprintf('Could not derive %s, linked to %s', hl, fallbacks[1])
+      return
     end
   end
 
