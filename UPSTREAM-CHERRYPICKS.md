@@ -60,5 +60,6 @@ Our HEAD at time of evaluation: `88a2d91` (2026-05-01)
 | `42e6b87` | build(scripts): move generator files into scripts/ | ported | `gen_*.lua` moved to `scripts/`; Makefile + `generated.lua` paths updated |
 | `77b813d` | docs(readme): add luarocks badge | skipped | Badge-only change; not relevant to this fork |
 | `db486b4` | fix(git): handle redirected .git worktrees | skipped | Git-specific `GIT_DIR`/`GIT_WORK_TREE`/`core.worktree` logic; no hg equivalent |
-| `0d797da` | test(async): replace sleeps with event-driven waits | deferred | Large test harness change; depends on `d1e88d7` scratch isolation work |
-| `e7c0586` | test(harness): cleanup scratch at suite boundaries | deferred | Depends on `d1e88d7` scratch isolation work |
+| `0d797da` | test(async): replace sleeps with event-driven waits | partial | Ported shared async wait helpers, git lock serialization, and non-staging attach/blame/preview waits; staging-heavy action hunks remain dropped in this fork |
+| `e7c0586` | test(harness): cleanup scratch at suite boundaries | ported | Added repo-local `test/preload.lua` suite hooks to clean isolated scratch sessions under the temp-root harness |
+| `d1e88d7` | test(scratch): isolate repos and seed scratch copies | ported | Scratch repos now use per-session temp dirs outside the workspace, with seeded git/hg repo copies and refreshed cached helper paths after `clear()` |

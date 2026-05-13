@@ -7,14 +7,19 @@ local eq = helpers.eq
 local eq_path = helpers.eq_path
 local exec_lua = helpers.exec_lua
 local hg = helpers.hg
-local scratch = helpers.scratch
 local setup_hgsigns = helpers.setup_hgsigns
 local setup_test_hg_repo = helpers.setup_test_hg_repo
 local test_config = helpers.test_config
-local test_file = helpers.test_file
 local write_to_file = helpers.write_to_file
+local scratch --- @type string
+local test_file --- @type string
 
 helpers.env()
+
+local function refresh_paths()
+  scratch = helpers.scratch
+  test_file = helpers.test_file
+end
 
 local function qflist_snapshot()
   return exec_lua(function()
@@ -32,6 +37,7 @@ end
 describe('qflist (mercurial)', function()
   before_each(function()
     clear()
+    refresh_paths()
     helpers.chdir_tmp()
   end)
 

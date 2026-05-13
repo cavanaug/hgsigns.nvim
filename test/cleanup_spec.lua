@@ -8,13 +8,18 @@ local expectf = helpers.expectf
 local setup_hgsigns = helpers.setup_hgsigns
 local setup_test_hg_repo = helpers.setup_test_hg_repo
 local test_config = helpers.test_config
-local test_file = helpers.test_file
+local test_file --- @type string
 
 helpers.env()
+
+local function refresh_paths()
+  test_file = helpers.test_file
+end
 
 describe('cleanup', function()
   before_each(function()
     clear()
+    refresh_paths()
     helpers.chdir_tmp()
   end)
 

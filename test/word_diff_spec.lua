@@ -1,17 +1,20 @@
 local helpers = require('test.gs_helpers')
 
-local exec_lua = helpers.exec_lua
-local eq = helpers.eq
-local git = helpers.git
-local setup_test_repo = helpers.setup_test_repo
-local setup_hgsigns = helpers.setup_hgsigns
-local test_config = helpers.test_config
-local edit = helpers.edit
-local test_file = helpers.test_file
-local clear = helpers.clear
-local cleanup = helpers.cleanup
-local expectf = helpers.expectf
 local check = helpers.check
+local cleanup = helpers.cleanup
+local clear = helpers.clear
+local contains_hl = helpers.contains_hl
+local edit = helpers.edit
+local eq = helpers.eq
+local exec_lua = helpers.exec_lua
+local expectf = helpers.expectf
+local git = helpers.git
+local enable_lua_treesitter_on_filetype = helpers.enable_lua_treesitter_on_filetype
+local require_source_hls = helpers.require_source_hls
+local setup_hgsigns = helpers.setup_hgsigns
+local setup_test_repo = helpers.setup_test_repo
+local test_config = helpers.test_config
+local test_file --- @type string
 
 helpers.env()
 
@@ -19,42 +22,10 @@ local function refresh_paths()
   test_file = helpers.test_file
 end
 
-local function require_source_hls()
-  if helpers.fn.has('nvim-0.12') == 0 then
-    pending('requires Neovim 0.12+')
-  end
-end
-
 local function require_window_scoped_deleted_preview()
   if helpers.fn.has('nvim-0.11') == 0 then
     pending('requires window-scoped deleted preview support')
   end
-end
-
-local function enable_lua_treesitter_on_filetype()
-  exec_lua(function()
-    vim.api.nvim_create_autocmd('FileType', {
-      group = vim.api.nvim_create_augroup('hgsigns_word_diff_treesitter', { clear = true }),
-      pattern = 'lua',
-      callback = function(args)
-        pcall(vim.treesitter.start, args.buf, 'lua')
-        local ok, parser = pcall(vim.treesitter.get_parser, args.buf, 'lua')
-        if ok and parser then
-          pcall(parser.parse, parser, true)
-        end
-      end,
-    })
-
-    vim.cmd('syntax on')
-    vim.bo.filetype = 'lua'
-  end)
-end
-
-local function contains_hl(hl, group)
-  if type(hl) == 'table' then
-    return vim.tbl_contains(hl, group)
-  end
-  return hl == group
 end
 
 local function virt_hl_at_col(vline, col)
@@ -123,6 +94,7 @@ end
 describe('word diff', function()
   before_each(function()
     clear()
+    refresh_paths()
     setup_hgsigns()
   end)
 
@@ -191,6 +163,7 @@ end)
 describe('inline preview', function()
   before_each(function()
     clear()
+    refresh_paths()
     helpers.setup_path()
     helpers.chdir_tmp()
   end)
@@ -232,20 +205,16 @@ describe('inline preview', function()
     local start_col, end_col = exec_lua(function()
       require('hgsigns.async').run(require('hgsigns.actions.preview').preview_hunk_inline):wait()
 
-      local start_col0, end_col0 --- @type integer?, integer?
-      vim.wait(1000, function()
-        local ns = vim.api.nvim_get_namespaces().hgsigns_preview_inline
-        local marks = vim.api.nvim_buf_get_extmarks(0, ns, 0, -1, { details = true })
-        for _, mark in ipairs(marks) do
-          local details = mark[4]
-          if details and details.hl_group == 'HgsignsChangeInline' then
-            start_col0 = mark[3]
-            end_col0 = details.end_col
-            return true
-          end
+      local ns = vim.api.nvim_get_namespaces().hgsigns_preview_inline
+      local marks = vim.api.nvim_buf_get_extmarks(0, ns, 0, -1, { details = true })
+      for _, mark in ipairs(marks) do
+        local details = mark[4]
+        if details and details.hl_group == 'HgsignsChangeInline' then
+          return mark[3], details.end_col
         end
-      end)
-      return start_col0, end_col0
+      end
+
+      error('preview highlight not found')
     end)
 
     eq(expected_start, start_col)
@@ -429,7 +398,7 @@ describe('inline preview', function()
     })
     setup_hgsigns(test_config)
     edit(test_file)
-    enable_lua_treesitter_on_filetype()
+    enable_lua_treesitter_on_filetype('hgsigns_word_diff_treesitter')
 
     exec_lua(function()
       vim.api.nvim_buf_set_lines(0, 1, 2, false, { 'local bar = 1' })
@@ -635,6 +604,7 @@ end)
 describe('popup preview', function()
   before_each(function()
     clear()
+    refresh_paths()
     helpers.setup_path()
     helpers.chdir_tmp()
   end)
@@ -656,7 +626,7 @@ describe('popup preview', function()
     config.word_diff = true
     setup_hgsigns(config)
     edit(test_file)
-    enable_lua_treesitter_on_filetype()
+    enable_lua_treesitter_on_filetype('hgsigns_word_diff_treesitter')
 
     exec_lua(function()
       vim.api.nvim_buf_set_lines(0, 1, 2, false, { 'local bar = 1' })
@@ -737,7 +707,7 @@ describe('popup preview', function()
     })
     setup_hgsigns(test_config)
     edit(test_file)
-    enable_lua_treesitter_on_filetype()
+    enable_lua_treesitter_on_filetype('hgsigns_word_diff_treesitter')
 
     exec_lua(function()
       vim.api.nvim_buf_set_lines(0, 1, 2, false, { 'local bar = 1' })
@@ -1054,6 +1024,7 @@ end)
 describe('show_deleted', function()
   before_each(function()
     clear()
+    refresh_paths()
     helpers.setup_path()
     helpers.chdir_tmp()
   end)

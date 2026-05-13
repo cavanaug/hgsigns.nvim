@@ -17,10 +17,17 @@ local path_pattern = helpers.path_pattern
 local setup_hgsigns = helpers.setup_hgsigns
 local setup_test_hg_repo = helpers.setup_test_hg_repo
 local test_config = helpers.test_config
-local test_file = helpers.test_file
+local wait_for_attach = helpers.wait_for_attach
 local write_to_file = helpers.write_to_file
+local scratch --- @type string
+local test_file --- @type string
 
 helpers.env()
+
+local function refresh_paths()
+  scratch = helpers.scratch
+  test_file = helpers.test_file
+end
 
 local watcher_fallback_test_config = vim.tbl_deep_extend('force', vim.deepcopy(test_config), {
   _allow_fs_poll_fallback = true,
@@ -105,18 +112,10 @@ local function eq_bufs(expected)
   eq(normalized, get_bufs())
 end
 
----@param bufnr? integer
-local function wait_for_attach(bufnr)
-  expectf(function()
-    return exec_lua(function(bufnr0)
-      return vim.b[bufnr0 or 0].hgsigns_status_dict.gitdir ~= nil
-    end, bufnr)
-  end)
-end
-
 describe('gitdir_watcher (mercurial)', function()
   before_each(function()
     clear()
+    refresh_paths()
     helpers.chdir_tmp()
   end)
 
@@ -127,8 +126,8 @@ describe('gitdir_watcher (mercurial)', function()
   it('follows moved hg files with spaces', function()
     helpers.hg_init_scratch()
 
-    local old_name = helpers.scratch .. '/old name.txt'
-    local new_name = helpers.scratch .. '/new name.txt'
+    local old_name = scratch .. '/old name.txt'
+    local new_name = scratch .. '/new name.txt'
 
     write_to_file(old_name, { 'test' })
     hg('add', old_name)
@@ -208,7 +207,7 @@ describe('gitdir_watcher (mercurial)', function()
 
     wait_for_attach()
 
-    local alt_file = helpers.scratch .. '/alt.txt'
+    local alt_file = scratch .. '/alt.txt'
     helpers.write_to_file(alt_file, { 'alt buffer' })
     edit(alt_file)
     local alt_buf = helpers.api.nvim_get_current_buf()
@@ -229,8 +228,8 @@ describe('gitdir_watcher (mercurial)', function()
   it('debounces hg watcher refreshes across multiple buffers', function()
     helpers.hg_init_scratch()
 
-    local f1 = vim.fs.joinpath(helpers.scratch, 'file1')
-    local f2 = vim.fs.joinpath(helpers.scratch, 'file2')
+    local f1 = vim.fs.joinpath(scratch, 'file1')
+    local f2 = vim.fs.joinpath(scratch, 'file2')
 
     write_to_file(f1, { '1', '2', '3' })
     write_to_file(f2, { '1', '2', '3' })
@@ -291,7 +290,7 @@ describe('gitdir_watcher (mercurial)', function()
       end
 
       return captured
-    end, helpers.scratch)
+    end, scratch)
 
     eq(true, result.handles)
     eq(false, result.watcher)
@@ -359,7 +358,7 @@ describe('gitdir_watcher (mercurial)', function()
           return closed
         end)(),
       }
-    end, helpers.scratch)
+    end, scratch)
 
     eq(true, result.repo_gced)
     eq(true, result.watcher_gced)

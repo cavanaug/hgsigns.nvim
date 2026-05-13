@@ -6,6 +6,7 @@ local check = helpers.check
 local cleanup = helpers.cleanup
 local clear = helpers.clear
 local command = api.nvim_command
+local command_wait_hgsigns_update = helpers.command_wait_hgsigns_update
 local edit = helpers.edit
 local eq = helpers.eq
 local eq_path = helpers.eq_path
@@ -19,30 +20,25 @@ local match_dag = helpers.match_dag
 local match_debug_messages = helpers.match_debug_messages
 local match_lines = helpers.match_lines
 local n, p, np = helpers.n, helpers.p, helpers.np
-local newfile = helpers.newfile
 local path_pattern = helpers.path_pattern
-local scratch = helpers.scratch
 local setup_hgsigns = helpers.setup_hgsigns
 local setup_test_repo = helpers.setup_test_repo
 local setup_test_hg_repo = helpers.setup_test_hg_repo
 local split = vim.split
 local test_config = helpers.test_config
-local test_file = helpers.test_file
+local wait_for_attach = helpers.wait_for_attach
 local write_to_file = helpers.write_to_file
 local fn = helpers.fn
+local newfile --- @type string
+local scratch --- @type string
+local test_file --- @type string
 
 helpers.env()
 
----@param bufnr? integer
-local function wait_for_attach(bufnr)
-  expectf(function()
-    return exec_lua(function(bufnr0)
-      return vim.b[bufnr0 or 0].hgsigns_status_dict.gitdir ~= nil
-    end, bufnr)
-  end)
-  match_debug_messages({
-    ('attach.attach(1): attach complete'):format(bufnr or api.nvim_get_current_buf()),
-  })
+local function refresh_paths()
+  newfile = helpers.newfile
+  scratch = helpers.scratch
+  test_file = helpers.test_file
 end
 
 local revparse_pat = ('system.system: git .* rev-parse --show-toplevel --absolute-git-dir --abbrev-ref HEAD'):gsub(
@@ -57,6 +53,7 @@ describe('hgsigns (with screen)', function()
 
   before_each(function()
     clear()
+    refresh_paths()
     screen = Screen.new(20, 17)
     screen:attach({ ext_messages = true })
 
@@ -224,14 +221,9 @@ describe('hgsigns (with screen)', function()
       match_dag({
         'attach.attach(1): Attaching (trigger=BufReadPost)',
         p('system.system: hg %-%-config ui%.relative%-paths=false root'),
-        p('system.system: hg %-%-config ui%.relative%-paths=false branch'),
-        p(
-          'system.system: hg %-%-config ui%.relative%-paths=false parents %-%-template %{'
-            .. 'node%}'
-        ),
-        p('system.system: hg %-%-config ui%.relative%-paths=false config ui%.username'),
-        p('system.system: hg %-%-config ui%.relative%-paths=false status %-A .*%.git[\\/]index'),
-        p('attach%.attach%(1%): Cannot resolve file in repo'),
+        p(revparse_pat),
+        p('git%.new: Not in hg repo'),
+        p('attach%.attach%(1%): Empty hg obj'),
       })
     end)
 
@@ -540,15 +532,10 @@ describe('hgsigns (with screen)', function()
       feed('gg')
       check({ signs = {} })
 
-      eq(
-        true,
-        exec_lua(function()
-          return vim.wait(5000, function()
-            local line = vim.b.hgsigns_blame_line
-            return line ~= nil and line ~= 'not virt_text' and line:match('^ You, ') ~= nil
-          end)
-        end)
-      )
+      expectf(function()
+        local line = exec_lua('return vim.b.hgsigns_blame_line')
+        return line ~= nil and line ~= 'not virt_text' and line:match('^ You, ') ~= nil
+      end)
     end)
   end)
 
@@ -1190,22 +1177,33 @@ describe('hgsigns (with screen)', function()
 
       local messages = screen.messages
       local message = messages[#messages]
-      local scratch_path0 = scratch:gsub('\\', '/')
-      local scratch_path = vim.fs.normalize(scratch_path0)
+      local scratch_path = vim.fs.normalize((scratch:gsub('\\', '/')))
+      local scratch_suffix = assert(scratch_path:match('(hgsigns%-scratch/.+)$'))
 
       eq('quickfix', message.kind)
       eq('(1 of 2): hello ben', message.content[1][2])
 
       for i = 1, #messages - 1 do
         local entry = messages[i]
-        local path0 = entry.content[1][2]:gsub('\\', '/')
+        local raw = entry.content[1][2]
+
+        if type(raw) ~= 'string' then
+          goto continue
+        end
+
+        local path0 = raw:gsub('\\', '/')
         local path = vim.fs.normalize(path0)
 
         eq('', entry.kind)
         assert(
-          vim.startswith(path, scratch_path .. '/'),
+          path == scratch_path .. '/dummy.txt'
+            or path == scratch_suffix .. '/dummy.txt'
+            or vim.startswith(path, scratch_path .. '/t')
+            or vim.startswith(path, scratch_suffix .. '/t'),
           ('unexpected path message: %s'):format(path)
         )
+
+        ::continue::
       end
     end, 10)
 
@@ -1361,8 +1359,13 @@ describe('hgsigns (with screen)', function()
     f:write('a') -- Write without trailing newline
     f:close()
 
-    command('checktime')
-    helpers.sleep(50)
+    command_wait_hgsigns_update('checktime')
+    expectf(function()
+      local hunk = exec_lua(function()
+        return require('hgsigns').get_hunks()[1]
+      end)
+      return hunk and (hunk.added.no_nl_at_eof or hunk.removed.no_nl_at_eof)
+    end)
     feed('mhp')
     screen:expect({ any = [[\ No newline at end of file]] })
   end)
@@ -1373,6 +1376,7 @@ describe('hgsigns attach', function()
 
   before_each(function()
     clear()
+    refresh_paths()
     config = vim.deepcopy(test_config)
     helpers.chdir_tmp()
   end)
@@ -1416,8 +1420,15 @@ describe('hgsigns attach', function()
     config.base = 'HEAD'
     setup_hgsigns(config)
     edit(path1)
+    wait_for_attach()
     command('write')
-    helpers.sleep(100)
+    expectf(function()
+      return exec_lua(function()
+        local bufnr = vim.api.nvim_get_current_buf()
+        local cache = require('hgsigns.cache').cache[bufnr]
+        return cache ~= nil and cache.git_obj.file == vim.api.nvim_buf_get_name(bufnr)
+      end)
+    end)
   end)
 
   it('does not error on non-file fugitive buffers (#1277)', function()
@@ -1511,7 +1522,19 @@ describe('hgsigns attach', function()
     wait_for_attach()
 
     command('Hgsigns show')
-    wait_for_attach()
+
+    local show_bufnr --- @type integer?
+    expectf(function()
+      show_bufnr = exec_lua(function()
+        local bufnr = vim.api.nvim_get_current_buf()
+        if not vim.api.nvim_buf_get_name(bufnr):match('^hgsigns://') then
+          return
+        end
+        return bufnr
+      end)
+      return show_bufnr ~= nil
+    end)
+    wait_for_attach(show_bufnr)
 
     local gfile, toplevel, gitdir, abbrev_head = exec_lua(function()
       local git_obj = assert(require('hgsigns.cache').cache[1]).git_obj

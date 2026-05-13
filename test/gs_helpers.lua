@@ -9,21 +9,29 @@ local matches = helpers.matches
 local eq = helpers.eq
 local buf_get_var = helpers.api.nvim_buf_get_var
 local system = helpers.fn.system
+local nvim_test_clear = helpers.clear
 local uv = vim.uv or vim.loop ---@diagnostic disable-line: deprecated
 
 --- @return boolean
 local function is_win()
-  return M.fn.has('win32') == 1
+  local uname = uv.os_uname()
+  return uname and uname.sysname == 'Windows_NT' or package.config:sub(1, 1) == '\\'
 end
 
 --- @return boolean
 local function has_cygpath()
-  return is_win() and M.fn.executable('cygpath') == 1
+  return is_win() and vim.fn.executable('cygpath') == 1
 end
 
 --- @param path string
 local function local_stat(path)
   return uv.fs_stat(path)
+end
+
+--- @param path string
+--- @return boolean
+local function local_exists(path)
+  return local_stat(path) ~= nil
 end
 
 --- @param path string
@@ -105,9 +113,35 @@ local function local_delete(path)
   end
 end
 
-M.scratch = os.getenv('PJ_ROOT') .. '/scratch'
-M.test_file = M.scratch .. '/dummy.txt'
-M.newfile = M.scratch .. '/newfile.txt'
+local scratch_root = local_tmpdir() .. '/hgsigns-scratch'
+local scratch_session = scratch_root
+  .. '/session-'
+  .. tostring(uv.os_getpid and uv.os_getpid() or 0)
+  .. '-'
+  .. tostring(uv.hrtime())
+local scratch_seq = 0
+local empty_git_repo_seed = scratch_session .. '/seed-git-empty'
+local default_git_repo_seed = scratch_session .. '/seed-git-default'
+local empty_hg_repo_seed = scratch_session .. '/seed-hg-empty'
+local default_hg_repo_seed = scratch_session .. '/seed-hg-default'
+
+--- @param path string
+local function set_scratch(path)
+  M.scratch = path
+  M.test_file = path .. '/dummy.txt'
+  M.newfile = path .. '/newfile.txt'
+end
+
+local function next_scratch()
+  scratch_seq = scratch_seq + 1
+  return scratch_session .. ('/test-%04d'):format(scratch_seq)
+end
+
+local function reset_scratch()
+  set_scratch(next_scratch())
+end
+
+reset_scratch()
 
 M.test_config = {
   debug_mode = true,
@@ -165,6 +199,18 @@ local function normalize_repo_args(args)
   return args
 end
 
+--- @param cwd? string
+--- @return string[]
+local function hg_cmd(cwd)
+  local cmd = is_win() and { 'hg' } or { 'env', 'HGPLAIN=1', 'LC_ALL=C', 'LANGUAGE=C', 'hg' }
+
+  if cwd then
+    vim.list_extend(cmd, { '--cwd', cwd, '--config', 'ui.relative-paths=false' })
+  end
+
+  return cmd
+end
+
 --- Run a git command
 --- @param ... string
 function M.git(...)
@@ -176,7 +222,164 @@ end
 --- @param ... string
 function M.hg(...)
   local args = normalize_repo_args({ ... }) --- @type string[]
-  system(vim.list_extend({ 'hg', '--cwd', M.scratch }, args))
+  system(vim.list_extend(hg_cmd(M.scratch), args))
+end
+
+--- @param cmd string[]
+--- @param errmsg string
+local function system_ok(cmd, errmsg)
+  local output = system(cmd)
+  eq(0, exec_lua('return vim.v.shell_error'), ('%s\n%s'):format(errmsg, output))
+end
+
+--- @param path string
+--- @param ... string
+local function git_in(path, ...)
+  system_ok(
+    vim.list_extend({ 'git', '-C', path }, { ... }),
+    ('git command failed in %s'):format(path)
+  )
+end
+
+local function configure_git_repo(path)
+  -- Always force color to test settings don't interfere with hgsigns system
+  -- commands (addresses #23).
+  git_in(path, 'config', 'color.branch', 'always')
+  git_in(path, 'config', 'color.ui', 'always')
+  git_in(path, 'config', 'color.diff', 'always')
+  git_in(path, 'config', 'color.interactive', 'always')
+  git_in(path, 'config', 'color.status', 'always')
+  git_in(path, 'config', 'color.grep', 'always')
+  git_in(path, 'config', 'color.pager', 'true')
+  git_in(path, 'config', 'color.decorate', 'always')
+  git_in(path, 'config', 'color.showbranch', 'always')
+  git_in(path, 'config', 'core.autocrlf', 'false')
+  git_in(path, 'config', 'core.eol', 'lf')
+
+  git_in(path, 'config', 'merge.conflictStyle', 'merge')
+
+  git_in(path, 'config', 'user.email', 'tester@com.com')
+  git_in(path, 'config', 'user.name', 'tester')
+
+  git_in(path, 'config', 'init.defaultBranch', 'main')
+end
+
+--- @param path string
+local function init_git_repo(path)
+  if local_exists(path) then
+    local_delete(path)
+  end
+
+  M.mkdir(path)
+  git_in(path, 'init', '-b', 'main')
+  configure_git_repo(path)
+end
+
+--- @param path string
+local function configure_hg_repo(path)
+  M.write_to_file(path .. '/.hg/hgrc', {
+    '[ui]',
+    'username = tester <tester@com.com>',
+  })
+end
+
+--- @param path string
+local function init_hg_repo(path)
+  if local_exists(path) then
+    local_delete(path)
+  end
+
+  M.mkdir(path)
+  system_ok(
+    vim.list_extend(hg_cmd(), { 'init', path }),
+    ('failed to init hg repo in %s'):format(path)
+  )
+  configure_hg_repo(path)
+end
+
+--- @param path string
+--- @param ... string
+local function hg_in(path, ...)
+  system_ok(vim.list_extend(hg_cmd(path), { ... }), ('hg command failed in %s'):format(path))
+end
+
+--- @param src string
+--- @param dst string
+local function local_copy_dir_fallback(src, dst)
+  local stat = assert(local_stat(src), ('failed to stat %s'):format(src))
+  if stat.type == 'directory' then
+    M.mkdir(dst)
+
+    local handle = uv.fs_scandir(src)
+    if not handle then
+      return
+    end
+
+    while true do
+      local name = uv.fs_scandir_next(handle)
+      if not name then
+        break
+      end
+      local_copy_dir_fallback(src .. '/' .. name, dst .. '/' .. name)
+    end
+    return
+  end
+
+  assert(uv.fs_copyfile(src, dst))
+end
+
+--- @param src string
+--- @param dst string
+local function copy_dir(src, dst)
+  local parent = vim.fs.dirname(dst)
+  if parent then
+    M.mkdir(parent)
+  end
+
+  if is_win() then
+    local_copy_dir_fallback(src, dst)
+    return
+  end
+
+  system_ok({ 'cp', '-R', src, dst }, ('failed to copy %s to %s'):format(src, dst))
+end
+
+--- @return string
+local function ensure_empty_git_repo_seed()
+  if not local_exists(empty_git_repo_seed) then
+    init_git_repo(empty_git_repo_seed)
+  end
+  return empty_git_repo_seed
+end
+
+--- @return string
+local function ensure_default_git_repo_seed()
+  if not local_exists(default_git_repo_seed) then
+    copy_dir(ensure_empty_git_repo_seed(), default_git_repo_seed)
+    M.write_to_file(default_git_repo_seed .. '/dummy.txt', test_file_text)
+    git_in(default_git_repo_seed, 'add', 'dummy.txt')
+    git_in(default_git_repo_seed, 'commit', '-m', 'init commit')
+  end
+  return default_git_repo_seed
+end
+
+--- @return string
+local function ensure_empty_hg_repo_seed()
+  if not local_exists(empty_hg_repo_seed) then
+    init_hg_repo(empty_hg_repo_seed)
+  end
+  return empty_hg_repo_seed
+end
+
+--- @return string
+local function ensure_default_hg_repo_seed()
+  if not local_exists(default_hg_repo_seed) then
+    copy_dir(ensure_empty_hg_repo_seed(), default_hg_repo_seed)
+    M.write_to_file(default_hg_repo_seed .. '/dummy.txt', test_file_text)
+    hg_in(default_hg_repo_seed, 'add', 'dummy.txt')
+    hg_in(default_hg_repo_seed, 'commit', '-m', 'init commit', '-u', 'tester')
+  end
+  return default_hg_repo_seed
 end
 
 function M.cleanup()
@@ -193,8 +396,8 @@ function M.cleanup()
       pcall(vim.cmd, 'silent! cd ' .. vim.fn.fnameescape(tmpdir0))
 
       for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-        local name = vim.api.nvim_buf_get_name(buf)
-        if name ~= '' and name:find(root, 1, true) then
+        local ok, name = pcall(vim.api.nvim_buf_get_name, buf)
+        if ok and name ~= '' and name:find(root, 1, true) then
           pcall(vim.api.nvim_buf_delete, buf, { force = true })
         end
       end
@@ -209,11 +412,29 @@ function M.cleanup()
     end
   end
 
-  if not local_stat(M.scratch) then
+  if not local_exists(M.scratch) then
     return
   end
 
   local_delete(M.scratch)
+end
+
+function M.cleanup_scratch_root()
+  M.cleanup()
+
+  if not local_exists(scratch_root) then
+    return
+  end
+
+  local_delete(scratch_root)
+end
+
+--- Starts a new global Nvim session and allocates an isolated scratch repo.
+--- @param init_lua_path? string
+function M.clear(init_lua_path)
+  M.cleanup()
+  nvim_test_clear(init_lua_path)
+  reset_scratch()
 end
 
 --- @param path string
@@ -287,39 +508,12 @@ end
 
 function M.git_init_scratch()
   M.cleanup()
-  M.mkdir(M.scratch)
-  M.git('init', '-b', 'main')
-
-  -- Always force color to test settings don't interfere with hgsigns systems
-  -- commands (addresses #23)
-  M.git('config', 'color.branch', 'always')
-  M.git('config', 'color.ui', 'always')
-  M.git('config', 'color.diff', 'always')
-  M.git('config', 'color.interactive', 'always')
-  M.git('config', 'color.status', 'always')
-  M.git('config', 'color.grep', 'always')
-  M.git('config', 'color.pager', 'true')
-  M.git('config', 'color.decorate', 'always')
-  M.git('config', 'color.showbranch', 'always')
-  M.git('config', 'core.autocrlf', 'false')
-  M.git('config', 'core.eol', 'lf')
-
-  M.git('config', 'merge.conflictStyle', 'merge')
-
-  M.git('config', 'user.email', 'tester@com.com')
-  M.git('config', 'user.name', 'tester')
-
-  M.git('config', 'init.defaultBranch', 'main')
+  copy_dir(ensure_empty_git_repo_seed(), M.scratch)
 end
 
 function M.hg_init_scratch()
   M.cleanup()
-  M.mkdir(M.scratch)
-  system({ 'hg', 'init', M.scratch })
-  M.write_to_file(M.scratch .. '/.hg/hgrc', {
-    '[ui]',
-    'username = tester <tester@com.com>',
-  })
+  copy_dir(ensure_empty_hg_repo_seed(), M.scratch)
 end
 
 --- Setup a basic git repository in directory `helpers.scratch` with a single file
@@ -327,6 +521,12 @@ end
 --- @param opts? {test_file_text?: string[], no_add?: boolean}
 function M.setup_test_repo(opts)
   local text = opts and opts.test_file_text or test_file_text
+  if not (opts and opts.no_add) and vim.deep_equal(text, test_file_text) then
+    M.cleanup()
+    copy_dir(ensure_default_git_repo_seed(), M.scratch)
+    return
+  end
+
   M.git_init_scratch()
   M.write_to_file(M.test_file, text)
   if not (opts and opts.no_add) then
@@ -340,6 +540,16 @@ end
 --- @param opts? {test_file_text?: string[], no_add?: boolean, branch?: string}
 function M.setup_test_hg_repo(opts)
   local text = opts and opts.test_file_text or test_file_text
+  if
+    not (opts and opts.no_add)
+    and not (opts and opts.branch)
+    and vim.deep_equal(text, test_file_text)
+  then
+    M.cleanup()
+    copy_dir(ensure_default_hg_repo_seed(), M.scratch)
+    return
+  end
+
   M.hg_init_scratch()
   M.write_to_file(M.test_file, text)
   if opts and opts.branch then
@@ -368,9 +578,90 @@ function M.expectf(cond, interval)
   cond()
 end
 
+--- @return boolean
+function M.supports_source_hls()
+  return M.fn.has('nvim-0.12') == 1
+end
+
+function M.require_source_hls()
+  if not M.supports_source_hls() then
+    pending('requires Neovim 0.12+')
+  end
+end
+
+--- @param hl string|string[]?
+--- @param group string
+--- @return boolean
+function M.contains_hl(hl, group)
+  if type(hl) == 'table' then
+    return vim.tbl_contains(hl, group)
+  end
+
+  return hl == group
+end
+
 --- @param path string
 function M.edit(path)
   helpers.api.nvim_command('edit! ' .. M.fn.fnameescape(path))
+end
+
+--- Run a command and wait for the buffer's next HgsignsUpdate event.
+--- @param cmd string
+--- @param bufnr? integer
+function M.command_wait_hgsigns_update(cmd, bufnr)
+  M.exec_lua(function(cmd0, bufnr0)
+    local async = require('hgsigns.async')
+    local target_bufnr = bufnr0 == vim.NIL and vim.api.nvim_get_current_buf() or bufnr0
+
+    async
+      .run(function()
+        local event = async.event()
+        local group = vim.api.nvim_create_augroup('hgsigns_test_wait_update', { clear = true })
+        local autocmd --- @type integer
+
+        autocmd = vim.api.nvim_create_autocmd('User', {
+          group = group,
+          pattern = 'HgsignsUpdate',
+          callback = function(args)
+            if args.data and args.data.buffer == target_bufnr then
+              pcall(vim.api.nvim_del_autocmd, autocmd)
+              event:set()
+            end
+          end,
+        })
+
+        local ok, err = pcall(vim.cmd, cmd0)
+        if not ok then
+          pcall(vim.api.nvim_del_augroup_by_id, group)
+          error(err)
+        end
+
+        event:wait()
+        pcall(vim.api.nvim_del_augroup_by_id, group)
+      end)
+      :wait(5000)
+  end, cmd, bufnr == nil and vim.NIL or bufnr)
+end
+
+--- @param bufnr? integer
+function M.wait_for_attach(bufnr)
+  M.expectf(function()
+    return M.exec_lua(function(bufnr0)
+      if bufnr0 == vim.NIL then
+        bufnr0 = 0
+      end
+
+      local cache = require('hgsigns.cache').cache[bufnr0]
+      return cache ~= nil
+        and cache.git_obj ~= nil
+        and cache.hunks ~= nil
+        and vim.b[bufnr0].hgsigns_status_dict.gitdir ~= nil
+    end, bufnr == nil and vim.NIL or bufnr)
+  end)
+
+  M.match_debug_messages({
+    ('attach.attach(%d): attach complete'):format(bufnr or M.api.nvim_get_current_buf()),
+  })
 end
 
 --- @param path string
@@ -505,6 +796,26 @@ function M.setup_path()
   exec_lua(function(path)
     package.path = path
   end, package.path)
+end
+
+--- @param group_name? string
+function M.enable_lua_treesitter_on_filetype(group_name)
+  exec_lua(function(group_name0)
+    vim.api.nvim_create_autocmd('FileType', {
+      group = vim.api.nvim_create_augroup(group_name0, { clear = true }),
+      pattern = 'lua',
+      callback = function(args)
+        pcall(vim.treesitter.start, args.buf, 'lua')
+        local ok, parser = pcall(vim.treesitter.get_parser, args.buf, 'lua')
+        if ok and parser then
+          pcall(parser.parse, parser, true)
+        end
+      end,
+    })
+
+    vim.cmd('syntax on')
+    vim.bo.filetype = 'lua'
+  end, group_name or 'hgsigns_test_lua_treesitter')
 end
 
 --- @param config? table

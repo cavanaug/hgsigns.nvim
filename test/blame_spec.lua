@@ -1,97 +1,52 @@
 local helpers = require('test.gs_helpers')
 
-local setup_hgsigns = helpers.setup_hgsigns
-local feed = helpers.feed
-local test_file = helpers.test_file
-local edit = helpers.edit
-local exec_lua = helpers.exec_lua
-local fn = helpers.fn
-local test_config = helpers.test_config
-local clear = helpers.clear
-local expectf = helpers.expectf
-local setup_test_repo = helpers.setup_test_repo
-local setup_test_hg_repo = helpers.setup_test_hg_repo
-local eq = helpers.eq
 local check = helpers.check
+local clear = helpers.clear
+local edit = helpers.edit
+local enable_lua_treesitter_on_filetype = helpers.enable_lua_treesitter_on_filetype
+local eq = helpers.eq
+local exec_lua = helpers.exec_lua
+local expectf = helpers.expectf
+local feed = helpers.feed
+local fn = helpers.fn
 local git = helpers.git
 local hg = helpers.hg
-local scratch = helpers.scratch
+local require_source_hls = helpers.require_source_hls
+local setup_hgsigns = helpers.setup_hgsigns
+local setup_test_repo = helpers.setup_test_repo
+local setup_test_hg_repo = helpers.setup_test_hg_repo
+local test_config = helpers.test_config
+local wait_for_attach = helpers.wait_for_attach
 local write_to_file = helpers.write_to_file
+local scratch --- @type string
+local test_file --- @type string
 
 helpers.env()
+
+local function refresh_paths()
+  scratch = helpers.scratch
+  test_file = helpers.test_file
+end
 
 local function open_blame_window()
   exec_lua(function()
     local async = require('hgsigns.async')
-    async.run(require('hgsigns.actions.blame').blame):raise_on_error()
+    async.run(require('hgsigns.actions.blame').blame):wait(5000)
   end)
 
-  eq(
-    true,
-    exec_lua(function()
-      return vim.wait(10000, function()
-        return vim.bo.filetype == 'hgsigns-blame'
-      end)
-    end)
-  )
+  eq('hgsigns-blame', exec_lua('return vim.bo.filetype'))
 end
 
 local function open_full_blame_popup()
   exec_lua(function()
     local async = require('hgsigns.async')
-    async.run(require('hgsigns.actions.blame_line'), { full = true }):raise_on_error()
+    async.run(require('hgsigns.actions.blame_line'), { full = true }):wait(5000)
   end)
 
-  eq(
-    true,
-    exec_lua(function()
-      return vim.wait(5000, function()
-        return require('hgsigns.popup').is_open('blame') ~= nil
-      end)
-    end)
-  )
+  eq(true, exec_lua("return require('hgsigns.popup').is_open('blame') ~= nil"))
 end
 
-local function require_source_hls()
-  if fn.has('nvim-0.12') == 0 then
-    pending('requires Neovim 0.12+')
-  end
-end
-
-local function enable_lua_treesitter_on_filetype()
-  exec_lua(function()
-    vim.api.nvim_create_autocmd('FileType', {
-      group = vim.api.nvim_create_augroup('hgsigns_blame_treesitter', { clear = true }),
-      pattern = 'lua',
-      callback = function(args)
-        pcall(vim.treesitter.start, args.buf, 'lua')
-        local ok, parser = pcall(vim.treesitter.get_parser, args.buf, 'lua')
-        if ok and parser then
-          pcall(parser.parse, parser, true)
-        end
-      end,
-    })
-
-    vim.cmd('syntax on')
-    vim.bo.filetype = 'lua'
-  end)
-end
-
-local function open_blame_panel()
-  exec_lua(function()
-    local async = require('hgsigns.async')
-    async.run(require('hgsigns.actions.blame').blame):raise_on_error()
-  end)
-
-  eq(
-    true,
-    exec_lua(function()
-      return vim.wait(10000, function()
-        return vim.bo.filetype == 'hgsigns-blame'
-      end)
-    end)
-  )
-end
+local open_blame_panel = open_blame_window
 
 local function get_blame_panel_state()
   return exec_lua(function()
@@ -147,6 +102,7 @@ end
 describe('blame', function()
   before_each(function()
     clear()
+    refresh_paths()
     helpers.chdir_tmp()
     setup_hgsigns()
   end)
@@ -172,14 +128,11 @@ describe('blame', function()
     feed('3G')
     feed('r')
 
-    eq(
-      true,
-      exec_lua(function(initial_name)
-        return vim.wait(5000, function()
-          return vim.bo.filetype == 'hgsigns-blame' and vim.api.nvim_buf_get_name(0) ~= initial_name
-        end)
+    expectf(function()
+      return exec_lua(function(initial_name)
+        return vim.bo.filetype == 'hgsigns-blame' and vim.api.nvim_buf_get_name(0) ~= initial_name
       end, initial_blame_bufname)
-    )
+    end)
 
     eq({ 3, 0 }, helpers.api.nvim_win_get_cursor(0))
     eq('hgsigns-blame', exec_lua('return vim.bo.filetype'))
@@ -641,11 +594,7 @@ describe('blame', function()
 
     edit(file)
 
-    expectf(function()
-      return exec_lua(function()
-        return vim.b.hgsigns_status_dict.gitdir ~= nil
-      end)
-    end)
+    wait_for_attach()
 
     local result = exec_lua(function(file0)
       local async = require('hgsigns.async')
@@ -696,7 +645,7 @@ describe('blame', function()
     config.gh = true
     setup_hgsigns(config)
     edit(test_file)
-    enable_lua_treesitter_on_filetype()
+    enable_lua_treesitter_on_filetype('hgsigns_blame_treesitter')
 
     check({
       status = { head = 'default', added = 0, changed = 0, removed = 0 },
@@ -714,19 +663,7 @@ describe('blame', function()
       }
     end)
 
-    exec_lua(function()
-      local async = require('hgsigns.async')
-      async.run(require('hgsigns.actions.blame_line'), { full = true }):raise_on_error()
-    end)
-
-    eq(
-      true,
-      exec_lua(function()
-        return vim.wait(5000, function()
-          return require('hgsigns.popup').is_open('blame') ~= nil
-        end)
-      end)
-    )
+    open_full_blame_popup()
 
     expectf(function()
       local result = exec_lua(function()
@@ -864,19 +801,7 @@ describe('blame', function()
       }
     end)
 
-    exec_lua(function()
-      local async = require('hgsigns.async')
-      async.run(require('hgsigns.actions.blame_line'), { full = true }):raise_on_error()
-    end)
-
-    eq(
-      true,
-      exec_lua(function()
-        return vim.wait(5000, function()
-          return require('hgsigns.popup').is_open('blame') ~= nil
-        end)
-      end)
-    )
+    open_full_blame_popup()
 
     local result
     expectf(function()
