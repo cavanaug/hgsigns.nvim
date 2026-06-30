@@ -179,7 +179,57 @@ need changes.
 
 ---
 
-## 8. Upstream Cherry-Pick Log
+## 8. Keeping the Upstream Mirror Branch Current
+
+Before evaluating new upstream commits, update the dedicated sibling `main/`
+worktree to match `upstream/main`.
+
+Do this work in the `main/` worktree directory itself, not in `mercurial/`.
+In this repository layout, `mercurial/` is the fork branch worktree and
+`../main/` is the upstream mirror worktree.
+
+If you use Worktrunk, switch into the sibling `main/` worktree first instead of
+running the merge from `mercurial/`:
+
+```bash
+wt switch main
+git pull --ff-only upstream main
+wt switch mercurial
+```
+
+`wt switch main` changes your shell into the existing `main/` worktree. Run the
+fast-forward there, then switch back to the fork worktree with
+`wt switch mercurial` (or `wt switch -` to return to the previous worktree).
+
+Worktrunk does not provide a dedicated "fast-forward this branch from
+upstream/main" command. `wt merge` is for merging the current branch into a
+target branch (usually the default branch), which is the opposite direction of
+what we want here. Use `wt switch main` to enter the correct worktree, then use
+plain Git to update that checkout from `upstream/main`.
+
+```bash
+# In the sibling main/ worktree
+git checkout main
+git pull --ff-only upstream main
+
+# Return to the mercurial worktree when done
+git checkout mercurial
+```
+
+Example from the `mercurial/` worktree parent directory:
+
+```bash
+cd ../main
+git checkout main
+git pull --ff-only upstream main
+```
+
+Do not run the fast-forward from `mercurial/`; use the separate `main/`
+worktree so the upstream mirror branch is updated in its own checkout.
+
+---
+
+## 9. Upstream Cherry-Pick Log
 
 All upstream commits that have been evaluated — including ones deliberately
 skipped or deferred — are tracked in `UPSTREAM-CHERRYPICKS.md`.
@@ -187,8 +237,11 @@ skipped or deferred — are tracked in `UPSTREAM-CHERRYPICKS.md`.
 Before starting a new porting session:
 
 ```bash
-# Check what upstream has that we don't
-git fetch upstream
+# In the sibling main/ worktree, update the local main mirror
+git checkout main
+git pull --ff-only upstream main
+
+# Back in mercurial/, check what upstream has that we don't
 git log HEAD..upstream/main --oneline
 
 # Check what we've already evaluated (ported, skipped, or deferred)
