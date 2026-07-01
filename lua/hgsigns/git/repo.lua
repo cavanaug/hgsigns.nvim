@@ -7,8 +7,6 @@ local Path = util.Path
 local errors = require('hgsigns.git.errors')
 local Watcher = require('hgsigns.git.repo.watcher')
 
-local check_version = require('hgsigns.git.version').check
-
 local uv = vim.uv or vim.loop ---@diagnostic disable-line: deprecated
 
 local normalize_path --- @type fun(path?: string): string?
@@ -19,7 +17,6 @@ local parse_hg_status_lines --- @type fun(lines: string[]): Hgsigns.Repo.HgStatu
 --- @field toplevel string
 --- @field detached boolean
 --- @field abbrev_head string
---- @field vcs 'git'|'hg'
 --- @field head_oid? string
 
 --- @class Hgsigns.Repo : Hgsigns.RepoInfo
@@ -31,7 +28,6 @@ local parse_hg_status_lines --- @type fun(lines: string[]): Hgsigns.Repo.HgStatu
 --- @field private _watcher? Hgsigns.Repo.Watcher
 --- @field private _refs integer
 --- @field head_oid? string
---- @field head_ref? string
 --- @field commondir string
 local M = {}
 
@@ -87,255 +83,6 @@ local function to_relpath(toplevel, file)
   return normalized_file
 end
 
---- @param gitdir string
---- @return boolean
-local function is_rebasing(gitdir)
-  return Path.exists(Path.join(gitdir, 'rebase-merge'))
-    or Path.exists(Path.join(gitdir, 'rebase-apply'))
-end
-
---- @param value string?
---- @return string?
-local function trim(value)
-  if not value then
-    -- Preserve nil to signal "no value".
-    return
-  end
-  -- Normalize line endings/whitespace from ref files.
-  local trimmed = vim.trim(value)
-  -- Treat whitespace-only lines as absent.
-  return trimmed ~= '' and trimmed or nil
-end
-
---- @param path string
---- @return string?
-local function read_first_line(path)
-  local f = io.open(path, 'r')
-  if not f then
-    return
-  end
-  local line = f:read('*l')
-  f:close()
-  return trim(line)
-end
-
---- @param path string
-local function wait_for_unlock(path)
-  -- Git updates refs by taking `<ref>.lock` and then renaming into place.
-  -- Wait briefly so we don't read transient state when reacting to fs events.
-  --
-  -- TODO(lewis6991): should this be async?
-  vim.wait(1000, function()
-    return not Path.exists(path .. '.lock')
-  end, 10, true)
-end
-
---- Wait for `<path>.lock` to clear then read the first line of a file.
---- @param path string
---- @return string?
-local function read_first_line_wait(path)
-  wait_for_unlock(path)
-  return read_first_line(path)
-end
-
---- @param gitdir string
---- @return string?
-local function read_head(gitdir)
-  return read_first_line_wait(Path.join(gitdir, 'HEAD'))
-end
-
---- @param head string?
---- @return string?
-local function parse_head_ref(head)
-  return head and head:match('^ref:%s*(.+)$') or nil
-end
-
---- Return the abbreviated ref for HEAD (or short SHA if detached).
---- Equivalent to `git rev-parse --abbrev-ref HEAD`
---- @param gitdir string Must be an absolute path to the .git directory
---- @param head? string
---- @return string abbrev_head
-local function get_abbrev_head(gitdir, head)
-  head = head or assert(read_head(gitdir))
-  -- HEAD content is either:
-  --   "ref: refs/heads/<branch>"
-  --   "<commitsha>" (detached HEAD)
-  local refpath = parse_head_ref(head)
-  if refpath then
-    return refpath:match('^refs/heads/(.+)$') or refpath
-  end
-
-  assert(head:find('^[%x]+$'), 'Invalid HEAD content: ' .. head)
-
-  -- Detached HEAD -> like `git rev-parse --abbrev-ref HEAD`, return literal "HEAD"
-  local short_sha = log.debug_mode() and 'HEAD' or head:sub(1, 7)
-
-  if is_rebasing(gitdir) then
-    short_sha = short_sha .. '(rebasing)'
-  end
-  return short_sha
-end
-
---- @param gitdir string
---- @return string
-local function get_commondir(gitdir)
-  -- In linked worktrees, `gitdir` points at `.git/worktrees/<name>` while most
-  -- refs live under the main `.git` directory (the "commondir").
-  local commondir = read_first_line(Path.join(gitdir, 'commondir'))
-  if not commondir then
-    return gitdir
-  end
-  local abs = Path.join(gitdir, commondir)
-  return uv.fs_realpath(abs) or abs
-end
-
---- @param commondir string
---- @param refname string
---- @return string?
-local function read_packed_ref(commondir, refname)
-  local packed_refs_path = Path.join(commondir, 'packed-refs')
-  wait_for_unlock(packed_refs_path)
-  -- `packed-refs` is a flat map from refname to OID (with optional peeled
-  -- entries). Read it linearly as this is only used on debounced fs events.
-  local f = io.open(packed_refs_path, 'r')
-  if not f then
-    return
-  end
-  for line in f:lines() do
-    --- @cast line string
-    if line:sub(1, 1) ~= '#' and line:sub(1, 1) ~= '^' then
-      local oid, name = line:match('^(%x+)%s+(.+)$')
-      if name == refname then
-        f:close()
-        return oid
-      end
-    end
-  end
-  f:close()
-end
-
---- @param gitdir string
---- @param commondir? string
---- @param refname string
---- @return string?
-local function resolve_ref(gitdir, commondir, refname)
-  -- Resolve a refname to an OID by following symbolic refs and checking:
-  -- - worktree-local loose refs in `gitdir/`
-  -- - shared loose refs in `commondir/`
-  -- - `commondir/packed-refs`
-  local seen = {} --- @type table<string, true>
-  local current = refname
-
-  while current and current ~= '' do
-    if seen[current] then
-      log.dprintf('cycle detected in symbolic refs: %s', vim.inspect(vim.tbl_keys(seen)))
-      return
-    end
-    seen[current] = true
-
-    local line = read_first_line_wait(Path.join(gitdir, current))
-
-    if not line and commondir and commondir ~= gitdir then
-      line = read_first_line_wait(Path.join(commondir, current))
-    end
-
-    if not line then
-      log.dprintf('Ref %s not found as loose ref; checking packed-refs', current)
-      break
-    elseif line:match('^%x+$') then
-      return line
-    end
-
-    local symref = line:match('^ref:%s*(.+)$')
-    if symref then
-      current = symref
-    else
-      log.dprintf('Ref %s has invalid contents (%s); checking packed-refs', current, line)
-      break
-    end
-  end
-
-  if commondir and current then
-    -- Some refs are only stored in packed-refs.
-    local packed = read_packed_ref(commondir, current)
-    if packed and packed:match('^%x+$') then
-      return packed
-    end
-  end
-end
-
---- Manual implementation of `git rev-parse HEAD`.
---- @param gitdir string
---- @param commondir string
---- @return string? oid
---- @return string? err
-local function get_head_oid0(gitdir, commondir)
-  -- `.git/HEAD` can remain unchanged while its target ref moves (e.g. `git pull`
-  -- updating the checked-out branch). Resolve `HEAD` through loose refs and
-  -- packed-refs so we can detect branch moves without spawning `git`.
-  local head = read_head(gitdir)
-  if not head then
-    -- Unable to read HEAD.
-    return nil, 'unable to read HEAD file'
-  end
-
-  if head:match('^%x+$') then
-    -- Detached HEAD contains an OID directly.
-    return head
-  end
-
-  local ref = parse_head_ref(head)
-  if not ref then
-    -- Unrecognized HEAD format.
-    return nil, ('unrecognized HEAD contents: %s'):format(head)
-  end
-
-  local oid = resolve_ref(gitdir, commondir, ref)
-  if oid then
-    -- Resolved via loose refs or packed-refs.
-    return oid
-  end
-
-  -- Reftable stores refs in a different backend (no loose/packed refs).
-  if Path.exists(Path.join(commondir, 'reftable')) then
-    return nil, 'reftable'
-  end
-
-  -- Reftable cannot be parsed via loose refs/packed-refs. Keep a synchronous
-  -- fallback for correctness (rare setup). Some other backends or transient
-  -- states can also cause resolution to fail, so keep this as a general
-  -- fallback.
-  return nil, ('unable to resolve %s via loose refs/packed-refs'):format(ref)
-end
-
---- Manual implementation of `git rev-parse HEAD` with command fallback.
---- @param gitdir string
---- @param commondir string
---- @return string? oid
-local function get_head_oid(gitdir, commondir)
-  local oid0, err = get_head_oid0(gitdir, commondir)
-  if oid0 then
-    return oid0
-  end
-
-  log.dprintf('Falling back to `git rev-parse HEAD`: %s', err)
-
-  local stdout, stderr, code = async
-    .run(git_command, { '--git-dir', gitdir, 'rev-parse', 'HEAD' }, {
-      ignore_error = true,
-      vcs = 'git',
-    })
-    :wait()
-
-  local oid = stdout[1]
-
-  if code ~= 0 or not oid or not oid:match('^%x+$') then
-    log.dprintf('Fallback `git rev-parse HEAD` failed: code=%s oid=%s stderr=%s', code, oid, stderr)
-    return
-  end
-  return oid
-end
-
 --- Registers a callback to be invoked on update events.
 ---
 --- The provided callback function `cb` will be stored and called when an update
@@ -359,7 +106,7 @@ function M:lock(fn)
   return self._lock:with(fn)
 end
 
---- Run git command the with the objects gitdir and toplevel
+--- Run an hg command with the repo's toplevel as cwd.
 --- @async
 --- @param args table<any,any>
 --- @param spec? Hgsigns.Git.JobSpec
@@ -369,24 +116,7 @@ end
 function M:command(args, spec)
   spec = spec or {}
   spec.cwd = self.toplevel
-
-  if self.vcs == 'hg' then
-    spec.vcs = 'hg'
-    return git_command(args, spec)
-  end
-
-  local args0 = { '--git-dir', self.gitdir }
-
-  if self.detached then
-    -- If detached, we need to set the work tree to the toplevel so that git
-    -- commands work correctly.
-    args0 = vim.list_extend(args0, { '--work-tree', self.toplevel })
-  end
-
-  vim.list_extend(args0, args)
-
-  spec.vcs = 'git'
-  return git_command(args0, spec)
+  return git_command(args, spec)
 end
 
 --- @async
@@ -396,92 +126,40 @@ end
 function M:files_changed(base, include_untracked)
   local ret = {} --- @type {path:string, oldpath?:string, status?:string, deleted?:boolean}[]
 
-  if self.vcs == 'hg' then
-    local args = { 'status', '--copies' }
-    if base and base ~= ':0' then
-      vim.list_extend(args, { '--rev', base })
-    end
-
-    local parsed = parse_hg_status_lines(self:command(args)) or {}
-    for _, entry in ipairs(parsed) do
-      if entry.status ~= '?' or include_untracked then
-        ret[#ret + 1] = {
-          path = entry.path,
-          oldpath = entry.oldpath,
-          status = entry.status,
-          deleted = entry.status == 'R' or nil,
-        }
-      end
-    end
-    return ret
-  end
-
+  local args = { 'status', '--copies' }
   if base and base ~= ':0' then
-    local results = self:command({ 'diff', '--name-status', base })
-    for _, result in ipairs(results) do
-      local parts = vim.split(result, '\t', { plain = true })
-      local status = parts[1]
-      local path = parts[#parts]
-      local renamed = status and (vim.startswith(status, 'R') or vim.startswith(status, 'C'))
-      if path then
-        ret[#ret + 1] = {
-          path = path,
-          oldpath = renamed and parts[2] or nil,
-          status = status,
-          deleted = status and vim.startswith(status, 'D') or nil,
-        }
-      end
-    end
-    if include_untracked then
-      local untracked = self:command({ 'ls-files', '--others', '--exclude-standard' })
-      for _, path in ipairs(untracked) do
-        ret[#ret + 1] = { path = path, status = '??' }
-      end
-    end
-    return ret
+    vim.list_extend(args, { '--rev', base })
   end
 
-  local results = self:command({ 'status', '--porcelain', '--ignore-submodules' })
-
-  for _, line in ipairs(results) do
-    local status = line:sub(1, 2)
-    local deleted = status:sub(1, 1) == 'D' or status:sub(2, 2) == 'D'
-    if status:match('^.M') or deleted or (include_untracked and status == '??') then
-      ret[#ret + 1] = { path = line:sub(4, -1), status = status, deleted = deleted or nil }
+  local parsed = parse_hg_status_lines(self:command(args)) or {}
+  for _, entry in ipairs(parsed) do
+    if entry.status ~= '?' or include_untracked then
+      ret[#ret + 1] = {
+        path = entry.path,
+        oldpath = entry.oldpath,
+        status = entry.status,
+        deleted = entry.status == 'R' or nil,
+      }
     end
   end
   return ret
 end
 
 --- @async
---- @param attr string
+--- @param _attr string
 --- @param files string[]
 --- @return table<string,'set'|'unset'|'unspecified'|string>
-function M:check_attr(attr, files)
+function M:check_attr(_attr, files)
   local ret = {} --- @type table<string,'set'|'unset'|'unspecified'|string>
 
   if #files == 0 then
     return ret
   end
 
+  -- Mercurial has no equivalent of git attributes; report everything as
+  -- unspecified.
   for _, f in ipairs(files) do
     ret[f] = 'unspecified'
-  end
-
-  if self.vcs == 'hg' then
-    return ret
-  end
-
-  local output = self:command({ 'check-attr', attr, '--stdin' }, { stdin = files })
-  local sep = ': ' .. attr .. ': '
-
-  for _, line in ipairs(output) do
-    local parts = vim.split(line, sep, { plain = true })
-    local file = parts[1]
-    if file and #parts >= 2 then
-      local value = table.concat(parts, sep, 2)
-      ret[file] = value
-    end
   end
 
   return ret
@@ -498,17 +176,15 @@ local function iconv_supported(encoding)
 end
 
 --- @async
---- Get version of file in the index, return array lines
+--- Get version of file at a revision, return array of lines.
 --- @param object string
 --- @param encoding? string
 --- @return string[] stdout, string? stderr
 function M:get_show_text(object, encoding)
-  local stdout, stderr
-  if self.vcs == 'hg' then
-    stdout, stderr = self:command({ 'cat', '-r', object }, { text = false, ignore_error = true })
-  else
-    stdout, stderr = self:command({ 'show', object }, { text = false, ignore_error = true })
-  end
+  local stdout, stderr = self:command(
+    { 'cat', '-r', object },
+    { text = false, ignore_error = true }
+  )
 
   if encoding and encoding ~= 'utf-8' and iconv_supported(encoding) then
     for i, l in ipairs(stdout) do
@@ -527,20 +203,14 @@ end
 --- @param encoding? string
 --- @return string[] stdout, string? stderr
 function M:get_show_text_at_revision(revision, relpath, encoding)
-  local stdout, stderr
-
-  if self.vcs == 'hg' then
-    stdout, stderr = self:command({ 'cat', '-r', revision, relpath }, {
-      text = false,
-      ignore_error = true,
-    })
-  else
-    stdout, stderr = self:get_show_text(revision .. ':' .. relpath, encoding)
-  end
+  local stdout, stderr = self:command({ 'cat', '-r', revision, relpath }, {
+    text = false,
+    ignore_error = true,
+  })
 
   local missing_path = stderr
     and (
-      (self.vcs == 'hg' and is_missing_hg_revision_path(stderr))
+      is_missing_hg_revision_path(stderr)
       or stderr:match(errors.e.path_does_not_exist)
       or stderr:match(errors.e.path_exist_on_disk_but_not_in)
     )
@@ -551,14 +221,10 @@ function M:get_show_text_at_revision(revision, relpath, encoding)
       or self:log_rename_status(revision, relpath)
     if old_path then
       log.dprintf('found rename %s -> %s', old_path, relpath)
-      if self.vcs == 'hg' then
-        stdout, stderr = self:command({ 'cat', '-r', revision, old_path }, {
-          text = false,
-          ignore_error = true,
-        })
-      else
-        stdout, stderr = self:get_show_text(revision .. ':' .. old_path, encoding)
-      end
+      stdout, stderr = self:command({ 'cat', '-r', revision, old_path }, {
+        text = false,
+        ignore_error = true,
+      })
     end
   end
 
@@ -575,15 +241,9 @@ end
 --- @param revision string
 --- @return string?
 function M:get_parent_revision(revision)
-  if self.vcs == 'hg' then
-    local stdout = self:command({ 'parents', '-r', revision, '-T', '{node}\n' }, {
-      ignore_error = true,
-    })
-    local parent = stdout[1]
-    return parent ~= '' and parent or nil
-  end
-
-  local stdout = self:command({ 'rev-parse', revision .. '^' }, { ignore_error = true })
+  local stdout = self:command({ 'parents', '-r', revision, '-T', '{node}\n' }, {
+    ignore_error = true,
+  })
   local parent = stdout[1]
   return parent ~= '' and parent or nil
 end
@@ -593,29 +253,25 @@ end
 --- @param relpath string
 --- @return string?
 function M:get_previous_path(revision, relpath)
-  if self.vcs == 'hg' then
-    local parsed = parse_hg_status_lines(self:command({
-      'status',
-      '--copies',
-      '--change',
-      revision,
-      '--',
-      relpath,
-    }, { ignore_error = true })) or {}
+  local parsed = parse_hg_status_lines(self:command({
+    'status',
+    '--copies',
+    '--change',
+    revision,
+    '--',
+    relpath,
+  }, { ignore_error = true })) or {}
 
-    for _, entry in ipairs(parsed) do
-      if entry.path == relpath then
-        if entry.status == 'A' then
-          return entry.oldpath
-        end
-        return relpath
+  for _, entry in ipairs(parsed) do
+    if entry.path == relpath then
+      if entry.status == 'A' then
+        return entry.oldpath
       end
+      return relpath
     end
-
-    return relpath
   end
 
-  return self:diff_rename_status(revision, true)[relpath] or relpath
+  return relpath
 end
 
 --- @private
@@ -655,66 +311,33 @@ function M._new(info)
   self._refs = 0
   self.head_oid = info.head_oid
 
-  if self.vcs == 'hg' then
-    self.username = self:command({ 'config', 'ui.username' }, { ignore_error = true })[1]
-    self.commondir = self.gitdir
-
-    if config.watch_gitdir.enable then
-      self._watcher = Watcher.new(self.gitdir, self.commondir, self.vcs)
-      self._watcher:on_update(function()
-        async
-          .run(function()
-            local info2 = M.get_info(self.toplevel, self.gitdir, self.toplevel)
-            if not info2 then
-              return
-            end
-
-            self.head_oid = info2.head_oid
-            if self.abbrev_head ~= info2.abbrev_head then
-              self.abbrev_head = info2.abbrev_head
-              log.dprintf('HEAD changed, updating abbrev_head to %s', self.abbrev_head)
-            end
-          end)
-          :raise_on_error()
-      end)
-    end
-
-    return self
+  -- Normalize `ui.username` to just the display name so it matches the author
+  -- names produced from `hg annotate` output (which `blame` compares against to
+  -- render "You"). Mercurial usernames are typically `Name <email>`.
+  local raw_username = self:command({ 'config', 'ui.username' }, { ignore_error = true })[1]
+  if raw_username then
+    local name = raw_username:match('^(.-)%s*<[^>]+>$')
+    self.username = (name and name ~= '' and name) or vim.trim(raw_username)
   end
-
-  self.username = self:command({ 'config', 'user.name' }, { ignore_error = true })[1]
-
-  self.commondir = get_commondir(self.gitdir)
+  self.commondir = self.gitdir
 
   if config.watch_gitdir.enable then
-    local head = read_head(self.gitdir)
-    self.head_ref = parse_head_ref(head)
-    self.head_oid = get_head_oid(self.gitdir, self.commondir)
-    self._watcher = Watcher.new(self.gitdir, self.commondir, self.vcs)
-    self._watcher:set_head_ref(self.head_ref)
+    self._watcher = Watcher.new(self.gitdir, self.commondir)
     self._watcher:on_update(function()
-      -- Recompute on every debounced tick. The checked-out branch can move
-      -- without `HEAD` changing (e.g. `refs/heads/main` update).
-      local head2 = read_head(self.gitdir)
-      if not head2 then
-        return
-      end
+      async
+        .run(function()
+          local info2 = M.get_info(self.toplevel, self.gitdir, self.toplevel)
+          if not info2 then
+            return
+          end
 
-      self.head_oid = get_head_oid(self.gitdir, self.commondir)
-      -- Set abbrev_head to empty string if head_oid is unavailable (.e.g repo
-      -- with no commits). This is consistent with `git rev-parse --abrev-ref
-      -- HEAD` which returns "HEAD" in this case.
-      local abbrev_head = self.head_oid and get_abbrev_head(self.gitdir, head2) or ''
-      if self.abbrev_head ~= abbrev_head then
-        self.abbrev_head = abbrev_head
-        log.dprintf('HEAD changed, updating abbrev_head to %s', self.abbrev_head)
-      end
-
-      local head_ref = parse_head_ref(head2)
-      if self.head_ref ~= head_ref then
-        self.head_ref = head_ref
-        self._watcher:set_head_ref(self.head_ref)
-      end
+          self.head_oid = info2.head_oid
+          if self.abbrev_head ~= info2.abbrev_head then
+            self.abbrev_head = info2.abbrev_head
+            log.dprintf('HEAD changed, updating abbrev_head to %s', self.abbrev_head)
+          end
+        end)
+        :raise_on_error()
     end)
   end
 
@@ -751,7 +374,6 @@ function M.get(cwd, gitdir, toplevel)
       repo.abbrev_head = info.abbrev_head
       repo.detached = info.detached
       repo.head_oid = info.head_oid
-      repo.vcs = info.vcs
     else
       repo = M._new(info)
       repo_cache[info.gitdir] = repo
@@ -780,34 +402,6 @@ normalize_path = function(path)
 end
 
 --- @async
---- @param gitdir string
---- @param head_str string
---- @param cwd string
---- @return string
-local function process_abbrev_head(gitdir, head_str, cwd)
-  if head_str ~= 'HEAD' then
-    return head_str
-  end
-
-  local short_sha = git_command({ 'rev-parse', '--short', 'HEAD' }, {
-    ignore_error = true,
-    cwd = cwd,
-    vcs = 'git',
-  })[1] or ''
-
-  -- Make tests easier
-  if short_sha ~= '' and log.debug_mode() then
-    short_sha = 'HEAD'
-  end
-
-  if is_rebasing(gitdir) then
-    return short_sha .. '(rebasing)'
-  end
-
-  return short_sha
-end
-
---- @async
 --- @param dir? string
 --- @param gitdir? string
 --- @param worktree? string
@@ -821,7 +415,6 @@ local function get_info_hg(dir, gitdir, worktree)
   local root_out, root_err, root_code = git_command({ 'root' }, {
     ignore_error = true,
     cwd = cwd,
-    vcs = 'hg',
   })
 
   if root_code > 0 then
@@ -845,7 +438,6 @@ local function get_info_hg(dir, gitdir, worktree)
   local branch_out, branch_err, branch_code = git_command({ 'branch' }, {
     ignore_error = true,
     cwd = toplevel_r,
-    vcs = 'hg',
   })
   if branch_code > 0 then
     return nil, string.format('got stderr: %s', branch_err or '')
@@ -856,7 +448,6 @@ local function get_info_hg(dir, gitdir, worktree)
     {
       ignore_error = true,
       cwd = toplevel_r,
-      vcs = 'hg',
     }
   )
   if parents_code > 0 then
@@ -868,84 +459,7 @@ local function get_info_hg(dir, gitdir, worktree)
     gitdir = assert(normalize_path(Path.join(toplevel_r, '.hg'))),
     abbrev_head = branch_out[1] or '',
     detached = false,
-    vcs = 'hg',
     head_oid = parents_out[1],
-  }
-end
-
---- @async
---- @param dir? string
---- @param gitdir? string
---- @param worktree? string
---- @return Hgsigns.RepoInfo? info, string? err
-local function get_info_git(dir, gitdir, worktree)
-  -- Does git rev-parse have --absolute-git-dir, added in 2.13:
-  --    https://public-inbox.org/git/20170203024829.8071-16-szeder.dev@gmail.com/
-  local has_abs_gd = check_version(2, 13)
-
-  -- Explicitly fallback to env vars for better debug
-  gitdir = gitdir or vim.env.GIT_DIR
-  worktree = worktree or vim.env.GIT_WORK_TREE or vim.fs.dirname(gitdir)
-
-  local stdout, stderr, code = git_command(
-    util.flatten({
-      gitdir and { '--git-dir', gitdir },
-      worktree and { '--work-tree', worktree },
-      'rev-parse',
-      '--show-toplevel',
-      has_abs_gd and '--absolute-git-dir' or '--git-dir',
-      '--abbrev-ref',
-      'HEAD',
-    }),
-    {
-      ignore_error = true,
-      -- Worktree may be a relative path, so don't set cwd when it is provided.
-      cwd = not worktree and dir or nil,
-      vcs = 'git',
-    }
-  )
-
-  -- If the repo has no commits yet, rev-parse will fail. Ignore this error.
-  if code > 0 and stderr and stderr:match(errors.e.ambiguous_head) then
-    code = 0
-  end
-
-  if code > 0 then
-    return nil, string.format('got stderr: %s', stderr or '')
-  end
-
-  if #stdout < 3 then
-    return nil, string.format('incomplete stdout: %s', table.concat(stdout, '\n'))
-  end
-  --- @cast stdout [string, string, string]
-
-  local toplevel_r = assert(normalize_path(stdout[1]))
-  local gitdir_r = assert(normalize_path(stdout[2]))
-  dir = normalize_path(dir)
-  gitdir = normalize_path(gitdir)
-
-  -- On windows, git will emit paths with `/` but dir may contain `\` so need to
-  -- normalize.
-  if dir and not vim.startswith(dir, toplevel_r) then
-    log.dprintf("'%s' is outside worktree '%s'", dir, toplevel_r)
-    -- outside of worktree
-    return
-  end
-
-  if not has_abs_gd then
-    gitdir_r = assert(normalize_path(uv.fs_realpath(gitdir_r)))
-  end
-
-  if gitdir and not worktree and gitdir ~= gitdir_r then
-    log.eprintf('expected gitdir to be %s, got %s', gitdir, gitdir_r)
-  end
-
-  return {
-    toplevel = toplevel_r,
-    gitdir = gitdir_r,
-    abbrev_head = process_abbrev_head(gitdir_r, stdout[3], toplevel_r),
-    detached = gitdir_r ~= assert(normalize_path(Path.join(toplevel_r, '.git'))),
-    vcs = 'git',
   }
 end
 
@@ -964,83 +478,7 @@ function M.get_info(dir, gitdir, worktree)
     return
   end
 
-  local explicit_hg = is_hg_gitdir(gitdir)
-  if explicit_hg then
-    return get_info_hg(dir, gitdir, worktree)
-  end
-
-  local hg_info, hg_err = get_info_hg(dir, gitdir, worktree)
-  local git_info, git_err = get_info_git(dir, gitdir, worktree)
-
-  if hg_info and git_info then
-    if #hg_info.toplevel > #git_info.toplevel then
-      return hg_info
-    end
-    return git_info
-  end
-
-  if hg_info then
-    return hg_info
-  end
-
-  if git_info then
-    return git_info
-  end
-
-  if hg_err and not is_not_in_hg_repo(hg_err) then
-    return nil, hg_err
-  end
-
-  return nil, git_err or hg_err
-end
-
---- @class (exact) Hgsigns.Repo.LsTree.Result
---- @field relpath string
---- @field mode_bits? string
---- @field object_name? string
---- @field object_type? 'blob'|'tree'|'commit'
-
---- @async
---- @param path string
---- @param revision string
---- @return Hgsigns.Repo.LsTree.Result? info
---- @return string? err
-function M:ls_tree(path, revision)
-  local results, stderr, code = self:command({
-    'ls-tree',
-    revision,
-    path,
-  }, { ignore_error = true })
-
-  if code > 0 then
-    return nil, stderr or tostring(code)
-  end
-
-  local res = results[1]
-
-  if not res then
-    -- Not found, see if it was renamed
-    log.dprintf('%s not found in %s looking for renames', path, revision)
-    local old_path = self:diff_rename_status(revision, true)[path]
-    if old_path then
-      log.dprintf('found rename %s -> %s', old_path, path)
-      return self:ls_tree(old_path, revision)
-    end
-
-    return nil, ('%s not found in %s'):format(path, revision)
-  end
-
-  local info, relpath = unpack(vim.split(res, '\t'))
-  assert(info and relpath)
-  local mode_bits, object_type, object_name = unpack(vim.split(info, '%s+'))
-  --- @cast object_type 'blob'|'tree'|'commit'
-
-  return {
-    relpath = relpath,
-    mode_bits = mode_bits,
-    object_name = object_name,
-    object_type = object_type,
-  }
+  return get_info_hg(dir, gitdir, worktree)
 end
 
 --- @async
@@ -1113,57 +551,11 @@ end
 --- @return Hgsigns.Repo.LsFiles.Result? info
 --- @return string? err
 function M:ls_files(file)
-  if self.vcs == 'hg' then
-    local relpath = to_relpath(self.toplevel, file)
-    if not relpath then
-      return {} --[[@as Hgsigns.Repo.LsFiles.Result]]
-    end
-    return self:hg_file_info(relpath)
+  local relpath = to_relpath(self.toplevel, file)
+  if not relpath then
+    return {} --[[@as Hgsigns.Repo.LsFiles.Result]]
   end
-
-  -- --others + --exclude-standard means ignored files won't return info, but
-  -- untracked files will. Unlike file_info_tree which won't return untracked
-  -- files.
-  local results, stderr, code = self:command(
-    util.flatten({
-      'ls-files',
-      '--stage',
-      '--others',
-      '--exclude-standard',
-      file,
-    }),
-    { ignore_error = true }
-  )
-
-  -- ignore_error for the cases when we run:
-  --    git ls-files --others exists/nonexist
-  if code > 0 and (not stderr or not stderr:match(errors.e.path_does_not_exist)) then
-    return nil, stderr or tostring(code)
-  end
-
-  local result = {
-    file_state = 'unknown',
-  } --- @type Hgsigns.Repo.LsFiles.Result
-  for _, line in ipairs(results) do
-    local parts = vim.split(line, '\t')
-    if #parts > 1 then -- tracked file
-      result.file_state = 'tracked'
-      local attrs = vim.split(parts[1], '%s+')
-      local stage = tonumber(attrs[3])
-      if stage <= 1 then
-        result.mode_bits = attrs[1]
-        result.object_name = attrs[2]
-      else
-        result.has_conflicts = true
-      end
-      result.relpath = parts[2]
-    else -- untracked file
-      result.relpath = parts[1]
-      result.file_state = 'unknown'
-    end
-  end
-
-  return result
+  return self:hg_file_info(relpath)
 end
 
 --- @param revision? string
@@ -1178,79 +570,28 @@ end
 --- @return Hgsigns.Repo.LsFiles.Result? info
 --- @return string? err
 function M:file_info(file, revision)
-  if self.vcs == 'hg' then
-    local relpath = to_relpath(self.toplevel, file)
-    if not relpath then
-      return nil, ('%s is outside repo'):format(file)
-    end
-
-    if M.from_tree(revision) then
-      local stdout, stderr = self:get_show_text_at_revision(assert(revision), relpath)
-      if stderr then
-        return nil, stderr
-      end
-      if #stdout == 0 then
-        return nil, ('%s not found in %s'):format(relpath, revision)
-      end
-      return {
-        relpath = relpath,
-        mode_bits = default_mode_bits(Path.join(self.toplevel, relpath)),
-        object_name = revision,
-        file_state = 'tracked',
-      }
-    end
-
-    return self:hg_file_info(relpath)
+  local relpath = to_relpath(self.toplevel, file)
+  if not relpath then
+    return nil, ('%s is outside repo'):format(file)
   end
 
   if M.from_tree(revision) then
-    local info, err = self:ls_tree(file, assert(revision))
-    if err then
-      return nil, err
+    local stdout, stderr = self:get_show_text_at_revision(assert(revision), relpath)
+    if stderr then
+      return nil, stderr
     end
-
-    if info and info.object_type == 'blob' then
-      return {
-        relpath = info.relpath,
-        mode_bits = info.mode_bits,
-        object_name = info.object_name,
-        file_state = 'tracked',
-      }
+    if #stdout == 0 then
+      return nil, ('%s not found in %s'):format(relpath, revision)
     end
-  else
-    local info, err = self:ls_files(file)
-    if err then
-      return nil, err
-    end
-
-    return info
-  end
-end
-
---- @param line string?
---- @return string? status
---- @return string? path
---- @return string? path2
-local function parse_name_status_line(line)
-  if not line then
-    return
+    return {
+      relpath = relpath,
+      mode_bits = default_mode_bits(Path.join(self.toplevel, relpath)),
+      object_name = revision,
+      file_state = 'tracked',
+    }
   end
 
-  local parts = vim.split(line, '\t', { plain = true })
-  if #parts < 2 then
-    return
-  end
-
-  local status = parts[1]
-  if not status then
-    return
-  end
-
-  if vim.startswith(status, 'R') or vim.startswith(status, 'C') then
-    return status, parts[2], parts[3]
-  end
-
-  return status, parts[2]
+  return self:hg_file_info(relpath)
 end
 
 --- @class (exact) Hgsigns.Repo.HgStatusEntry
@@ -1304,35 +645,19 @@ end
 --- @param path string
 --- @return string?
 function M:log_rename_status(revision, path)
-  if self.vcs == 'hg' then
-    local parsed = parse_hg_status_lines(self:command({
-      'status',
-      '--copies',
-      '--rev',
-      revision,
-      path,
-    })) or {}
-
-    for _, entry in ipairs(parsed) do
-      if entry.path == path and entry.oldpath then
-        return entry.oldpath
-      end
-    end
-    return
-  end
-
-  local out = self:command({
-    'log',
-    '--follow',
-    '--name-status',
-    '--diff-filter=R',
-    '--format=',
-    revision .. '..HEAD',
-    '--',
+  local parsed = parse_hg_status_lines(self:command({
+    'status',
+    '--copies',
+    '--rev',
+    revision,
     path,
-  })
-  local _, old_path = parse_name_status_line(out[#out])
-  return old_path
+  })) or {}
+
+  for _, entry in ipairs(parsed) do
+    if entry.path == path and entry.oldpath then
+      return entry.oldpath
+    end
+  end
 end
 
 --- @async
@@ -1340,42 +665,19 @@ end
 --- @param invert? boolean
 --- @return table<string,string>
 function M:diff_rename_status(revision, invert)
-  if self.vcs == 'hg' then
-    local args = { 'status', '--copies' }
-    if revision then
-      vim.list_extend(args, { '--rev', revision })
-    end
-
-    local parsed = parse_hg_status_lines(self:command(args)) or {}
-    local ret = {} --- @type table<string,string>
-    for _, entry in ipairs(parsed) do
-      if entry.status == 'A' and entry.oldpath then
-        if invert then
-          ret[entry.path] = entry.oldpath
-        else
-          ret[entry.oldpath] = entry.path
-        end
-      end
-    end
-    return ret
+  local args = { 'status', '--copies' }
+  if revision then
+    vim.list_extend(args, { '--rev', revision })
   end
 
-  local out = self:command({
-    'diff',
-    '--name-status',
-    '--find-renames',
-    '--find-copies',
-    '--cached',
-    revision,
-  })
+  local parsed = parse_hg_status_lines(self:command(args)) or {}
   local ret = {} --- @type table<string,string>
-  for _, l in ipairs(out) do
-    local stat, orig_file, new_file = parse_name_status_line(l)
-    if stat and vim.startswith(stat, 'R') and orig_file and new_file then
+  for _, entry in ipairs(parsed) do
+    if entry.status == 'A' and entry.oldpath then
       if invert then
-        ret[new_file] = orig_file
+        ret[entry.path] = entry.oldpath
       else
-        ret[orig_file] = new_file
+        ret[entry.oldpath] = entry.path
       end
     end
   end

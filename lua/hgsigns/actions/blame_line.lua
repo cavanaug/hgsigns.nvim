@@ -136,12 +136,7 @@ end
 --- @param repo Hgsigns.Repo
 --- @return Hgsigns.LineSpec[]
 local function build_full_blame_body(bufnr, info, repo)
-  local body0
-  if repo.vcs == 'hg' then
-    body0 = repo:command({ 'log', '-r', info.sha, '-T', '{desc}' }, { text = true })
-  else
-    body0 = repo:command({ 'show', '-s', '--format=%B', info.sha }, { text = true })
-  end
+  local body0 = repo:command({ 'log', '-r', info.sha, '-T', '{desc}' }, { text = true })
   local body = table.concat(body0, '\n')
   return vim.list_extend({
     { { body, 'NormalFloat' } },

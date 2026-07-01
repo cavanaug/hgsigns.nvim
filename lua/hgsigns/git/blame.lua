@@ -1,5 +1,3 @@
-local uv = vim.uv or vim.loop ---@diagnostic disable-line: deprecated
-
 local error_once = require('hgsigns.message').error_once
 local log = require('hgsigns.debug.log')
 local util = require('hgsigns.util')
@@ -32,13 +30,6 @@ local util = require('hgsigns.util')
 --- @field filename string
 --- @field previous_filename? string
 --- @field previous_sha? string
-
-local NOT_COMMITTED = {
-  author = 'Not Committed Yet',
-  author_mail = '<not.committed.yet>',
-  committer = 'Not Committed Yet',
-  committer_mail = '<not.committed.yet>',
-}
 
 local M = {}
 
@@ -73,146 +64,6 @@ function M.get_blame_nc(file, lnum)
   }
 end
 
----@param x any
----@return integer
-local function asinteger(x)
-  return assert(util.tointeger(x))
-end
-
---- @param readline fun(): string?
---- @param commits table<string,Hgsigns.CommitInfo?>
---- @param result table<integer,Hgsigns.BlameInfo>
-local function incremental_iter(readline, commits, result)
-  local line = assert(readline())
-
-  local sha, orig_lnum_str, final_lnum_str, size_str = line:match('(%x+) (%d+) (%d+) (%d+)')
-  if not sha then
-    error(("Could not parse sha from line: '%s'"):format(line))
-  end
-
-  local orig_lnum = asinteger(orig_lnum_str)
-  local final_lnum = asinteger(final_lnum_str)
-  local size = asinteger(size_str)
-
-  local commit = commits[sha]
-    or {
-      sha = sha,
-      abbrev_sha = sha:sub(1, 8) --[[@as string]],
-    }
-
-  --- @type string?, string?
-  local previous_sha, previous_filename
-
-  line = assert(readline())
-
-  -- filename terminates the entry
-  while not line:match('^filename ') do
-    local key, value = line:match('^([^%s]+) (.*)')
-    if key == 'previous' then
-      previous_sha, previous_filename = line:match('^previous (%x+) (.*)')
-    elseif key then
-      key = key:gsub('%-', '_') --- @type string
-      if vim.endswith(key, '_time') then
-        --- @diagnostic disable-next-line: assign-type-mismatch
-        commit[key] = asinteger(value)
-      else
-        commit[key] = value
-      end
-    else
-      --- @diagnostic disable-next-line: assign-type-mismatch
-      commit[line] = true
-      if line ~= 'boundary' then
-        log.dprintf("Unknown tag: '%s'", line)
-      end
-    end
-    line = assert(readline())
-  end
-
-  local filename = assert(line:match('^filename (.*)'))
-
-  -- New in git 2.41:
-  -- The output given by "git blame" that attributes a line to contents
-  -- taken from the file specified by the "--contents" option shows it
-  -- differently from a line attributed to the working tree file.
-  if
-    commit.author_mail == '<external.file>'
-    or commit.author_mail == 'External file (--contents)'
-  then
-    commit = vim.tbl_extend('force', commit, NOT_COMMITTED)
-  end
-  commits[sha] = commit --[[@as Hgsigns.CommitInfo]]
-
-  for j = 0, size - 1 do
-    result[final_lnum + j] = {
-      final_lnum = final_lnum + j,
-      orig_lnum = orig_lnum + j,
-      commit = commits[sha],
-      filename = filename,
-      previous_filename = previous_filename,
-      previous_sha = previous_sha,
-    }
-  end
-end
-
---- @param data string
---- @param partial? string
---- @return string[] lines
---- @return string? partial
-local function data_to_lines(data, partial)
-  local lines = vim.split(data, '\n')
-  if partial then
-    lines[1] = partial .. lines[1]
-    partial = nil
-  end
-
-  -- if data doesn't end with a newline, then the last line is partial
-  if lines[#lines] ~= '' then
-    partial = lines[#lines]
-  end
-
-  -- Clear the last line as it will be empty of the partial line
-  lines[#lines] = nil
-  return lines, partial
-end
-
---- @param f fun(readline: fun(): string?))
---- @return fun(data: string?)
-local function buffered_line_reader(f)
-  --- @param data string?
-  return coroutine.wrap(function(data)
-    if not data then
-      return
-    end
-
-    local data_lines, partial_line = data_to_lines(data)
-    local i = 0
-
-    --- @async
-    local function readline(peek)
-      if not data_lines[i + 1] then
-        -- No more data, wait for more
-        data = coroutine.yield()
-        if not data then
-          -- No more data, return the partial line if there is one
-          return partial_line
-        end
-        data_lines, partial_line = data_to_lines(data, partial_line)
-        i = 0
-      end
-
-      if peek then
-        return data_lines[i + 1]
-      end
-      i = i + 1
-      return data_lines[i]
-    end
-
-    while readline(true) do
-      f(readline)
-    end
-  end)
-end
-
 --- @param offset integer
 --- @return string
 local function hg_tz(offset)
@@ -240,10 +91,11 @@ local function hg_user(user)
 end
 
 --- @param filename string
---- @param line table<string, any>
+--- @param line table
+--- @param summary? string First line of the changeset description.
 --- @return string sha
 --- @return Hgsigns.CommitInfo
-local function parse_hg_commit(filename, line)
+local function parse_hg_commit(filename, line, summary)
   local sha = line.node
   if type(sha) ~= 'string' or not sha:match('^%x+$') then
     error(
@@ -276,7 +128,9 @@ local function parse_hg_commit(filename, line)
   end
 
   local author, author_mail = hg_user(line.user)
-  local summary = 'Version of ' .. filename
+  if summary == nil or summary == '' then
+    summary = 'Version of ' .. filename
+  end
 
   return sha,
     {
@@ -375,18 +229,23 @@ local function run_blame_hg(obj, revision, opts)
   -- The "copy" prefix makes the two line types unambiguous in the parser.
   local parent_map = {} --- @type table<string, string>   -- sha -> parent sha
   local copies_map = {} --- @type table<string, string>   -- sha -> prev filename
+  local desc_map = {} --- @type table<string, string>     -- sha -> commit summary
 
   local sha_list = vim.tbl_keys(unique_shas)
   if #sha_list > 0 then
     local revset = table.concat(sha_list, ' or ')
 
+    -- Emit, per revision:
+    --   "{sha} {p1sha}"                    — revision header
+    --   "desc {sha} {first line of desc}"  — commit summary (firstline has no \n)
+    --   "copy {sha} {newname}\t{source}"   — one per copy/rename entry
     local log_out = obj.repo:command({
       'log',
       '-r',
       revset,
       '--copies',
       '--template',
-      '{node} {p1node}{file_copies % "\ncopy {node} {name}\t{source}"}\n',
+      '{node} {p1node}\ndesc {node} {desc|firstline}{file_copies % "\ncopy {node} {name}\t{source}"}\n',
     }, { ignore_error = true })
 
     for _, ln in ipairs(log_out) do
@@ -403,6 +262,12 @@ local function run_blame_hg(obj, revision, opts)
               copies_map[sha_c] = src
             end
           end
+        end
+      elseif ln:sub(1, 5) == 'desc ' then
+        -- desc entry: "desc {sha} {summary}"
+        local sha_d = ln:sub(6, 45)
+        if sha_d:match('^%x+$') and ln:sub(46, 46) == ' ' then
+          desc_map[sha_d] = ln:sub(47)
         end
       else
         -- revision header: "{sha} {p1sha}"
@@ -424,7 +289,7 @@ local function run_blame_hg(obj, revision, opts)
       )
     end
 
-    local sha, commit = parse_hg_commit(filename, line)
+    local sha, commit = parse_hg_commit(filename, line, desc_map[line.node])
     commits[sha] = commits[sha] or commit
 
     local orig_lnum = util.tointeger(line.lineno)
@@ -462,96 +327,28 @@ end
 --- @async
 --- @param obj Hgsigns.GitObj
 --- @param contents? string[]
---- @param lnum? integer|[integer, integer]
+--- @param _lnum? integer|[integer, integer]
 --- @param revision? string
 --- @param opts? Hgsigns.BlameOpts
 --- @return table<integer, Hgsigns.BlameInfo>
 --- @return table<string, Hgsigns.CommitInfo?>
-function M.run_blame(obj, contents, lnum, revision, opts)
-  if obj.repo.vcs == 'hg' then
-    if not obj.object_name or obj.repo.abbrev_head == '' then
-      assert(contents, 'contents must be provided for untracked files')
-      local ret = {} --- @type table<integer,Hgsigns.BlameInfo>
-      local commit = not_committed(obj.file)
-      for i in ipairs(contents) do
-        ret[i] = {
-          orig_lnum = 0,
-          final_lnum = i,
-          commit = commit,
-          filename = obj.relpath or obj.file,
-        }
-      end
-      return ret, {}
-    end
-
-    return run_blame_hg(obj, revision, opts)
-  end
-
-  local ret = {} --- @type table<integer,Hgsigns.BlameInfo>
-
+function M.run_blame(obj, contents, _lnum, revision, opts)
   if not obj.object_name or obj.repo.abbrev_head == '' then
     assert(contents, 'contents must be provided for untracked files')
-    -- As we support attaching to untracked files we need to return something if
-    -- the file isn't isn't tracked in git.
-    -- If abbrev_head is empty, then assume the repo has no commits
+    local ret = {} --- @type table<integer,Hgsigns.BlameInfo>
     local commit = not_committed(obj.file)
     for i in ipairs(contents) do
       ret[i] = {
         orig_lnum = 0,
         final_lnum = i,
         commit = commit,
-        filename = obj.file,
+        filename = obj.relpath or obj.file,
       }
     end
     return ret, {}
   end
 
-  --- @type Hgsigns.BlameOpts
-  --- EmmyLuaLs/emmylua-analyzer-rust#921
-  opts = opts or {}
-
-  local ignore_file = obj.repo.toplevel .. '/.git-blame-ignore-revs'
-
-  local commits = {} --- @type table<string,Hgsigns.CommitInfo?>
-
-  local reader = buffered_line_reader(function(readline)
-    incremental_iter(readline, commits, ret)
-  end)
-
-  --- @param data string?
-  local function on_stdout(_, data)
-    reader(data)
-  end
-
-  local contents_str = contents and table.concat(contents, '\n') or nil
-
-  local _, stderr = obj.repo:command(
-    util.flatten({
-      'blame',
-      '--incremental',
-      contents and { '--contents', '-' },
-      opts.ignore_whitespace and '-w' or nil,
-      lnum and { '-L', type(lnum) == 'table' and (lnum[1] .. ',' .. lnum[2]) or (lnum .. ',+1') },
-      opts.extra_opts,
-      uv.fs_stat(ignore_file) and { '--ignore-revs-file', ignore_file },
-      revision,
-      '--',
-      obj.relpath,
-    }),
-    {
-      stdin = contents_str,
-      stdout = on_stdout,
-      ignore_error = true,
-    }
-  )
-
-  if stderr then
-    local msg = 'Error running git-blame: ' .. stderr
-    error_once(msg)
-    log.eprint(msg)
-  end
-
-  return ret, commits
+  return run_blame_hg(obj, revision, opts)
 end
 
 return M

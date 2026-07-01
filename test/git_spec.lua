@@ -4,8 +4,8 @@ local helpers = require('test.gs_helpers')
 local clear = helpers.clear
 local eq = helpers.eq
 local exec_lua = helpers.exec_lua
-local git = helpers.git
-local setup_test_repo = helpers.setup_test_repo
+local hg = helpers.hg
+local setup_test_repo = helpers.setup_test_hg_repo
 local write_to_file = helpers.write_to_file
 local scratch --- @type string
 
@@ -15,7 +15,7 @@ local function refresh_paths()
   scratch = helpers.scratch
 end
 
-describe('git', function()
+describe('hg', function()
   before_each(function()
     clear()
     refresh_paths()
@@ -75,16 +75,16 @@ describe('git', function()
   end)
 
   it('log_rename_status handles spaced filenames', function()
-    helpers.git_init_scratch()
+    helpers.hg_init_scratch()
 
     local old_name = scratch .. '/old name.txt'
     local new_name = scratch .. '/new name.txt'
 
     write_to_file(old_name, { 'test' })
-    git('add', old_name)
-    git('commit', '-m', 'init commit')
-    git('mv', old_name, new_name)
-    git('commit', '-m', 'rename file')
+    hg('add', old_name)
+    hg('commit', '-m', 'init commit', '-u', 'tester')
+    hg('mv', old_name, new_name)
+    hg('commit', '-m', 'rename file', '-u', 'tester')
 
     local old_relpath = exec_lua(function(repo_dir)
       local async = require('hgsigns.async')
@@ -93,7 +93,7 @@ describe('git', function()
       local repo = assert(async.run(Repo.get, repo_dir):wait(5000))
       return async
         .run(function()
-          return repo:log_rename_status('HEAD~1', 'new name.txt')
+          return repo:log_rename_status('.~1', 'new name.txt')
         end)
         :wait(5000)
     end, scratch)
@@ -102,16 +102,16 @@ describe('git', function()
   end)
 
   it('log_rename_status handles unicode filenames', function()
-    helpers.git_init_scratch()
+    helpers.hg_init_scratch()
 
     local old_name = scratch .. '/föobær.txt'
     local new_name = scratch .. '/bår.txt'
 
     write_to_file(old_name, { 'test' })
-    git('add', old_name)
-    git('commit', '-m', 'init commit')
-    git('mv', old_name, new_name)
-    git('commit', '-m', 'rename file')
+    hg('add', old_name)
+    hg('commit', '-m', 'init commit', '-u', 'tester')
+    hg('mv', old_name, new_name)
+    hg('commit', '-m', 'rename file', '-u', 'tester')
 
     local old_relpath = exec_lua(function(repo_dir)
       local async = require('hgsigns.async')
@@ -120,7 +120,7 @@ describe('git', function()
       local repo = assert(async.run(Repo.get, repo_dir):wait(5000))
       return async
         .run(function()
-          return repo:log_rename_status('HEAD~1', 'bår.txt')
+          return repo:log_rename_status('.~1', 'bår.txt')
         end)
         :wait(5000)
     end, scratch)

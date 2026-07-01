@@ -7,6 +7,7 @@ local api = vim.api
 --- @field fg_factor? number
 
 local M = {}
+local cmix --- @type fun(x?: integer, factor: number): integer?
 
 --- Use array of dict so we can iterate deterministically
 --- Export for docgen
@@ -189,7 +190,7 @@ end
 --- @param x? integer
 --- @param factor number
 --- @return integer?
-local function cmix(x, factor)
+cmix = function(x, factor)
   if not x or factor == 0 then
     return x
   end

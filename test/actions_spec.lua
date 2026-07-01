@@ -8,7 +8,7 @@ local exec_lua = helpers.exec_lua
 local api = helpers.api
 local test_config = helpers.test_config
 local clear = helpers.clear
-local setup_test_repo = helpers.setup_test_repo
+local setup_test_repo = helpers.setup_test_hg_repo
 local setup_test_hg_repo = helpers.setup_test_hg_repo
 local eq = helpers.eq
 local expectf = helpers.expectf
@@ -118,7 +118,7 @@ describe('actions', function()
     setup_test_repo()
     edit(test_file)
     check({
-      status = { head = 'main', added = 0, changed = 0, removed = 0 },
+      status = { head = 'default', added = 0, changed = 0, removed = 0 },
       signs = {},
     })
 
@@ -126,7 +126,7 @@ describe('actions', function()
       local async = require('hgsigns.async')
       local commit_buf = async
         .run(function()
-          return require('hgsigns.actions.show_commit')('main', 'edit')
+          return require('hgsigns.actions.show_commit')('.', 'edit')
         end)
         :wait(1000)
 
@@ -158,7 +158,7 @@ describe('actions', function()
 
     feed('jjjccEDIT<esc>')
     check({
-      status = { head = 'main', added = 0, changed = 1, removed = 0 },
+      status = { head = 'default', added = 0, changed = 1, removed = 0 },
       signs = { changed = 1 },
     })
 
@@ -294,7 +294,7 @@ describe('actions', function()
 
     feed('jjjccEDIT<esc>')
     check({
-      status = { head = 'main', added = 0, changed = 1, removed = 0 },
+      status = { head = 'default', added = 0, changed = 1, removed = 0 },
       signs = { changed = 1 },
     })
 
@@ -325,7 +325,7 @@ describe('actions', function()
     command('Hgsigns reset_hunk')
 
     check({
-      status = { head = 'main', added = 0, changed = 0, removed = 0 },
+      status = { head = 'default', added = 0, changed = 0, removed = 0 },
       signs = {},
     })
 
@@ -407,7 +407,7 @@ describe('actions', function()
     edit(test_file)
 
     check({
-      status = { head = 'main', added = 0, changed = 0, removed = 0 },
+      status = { head = 'default', added = 0, changed = 0, removed = 0 },
       signs = {},
     })
 

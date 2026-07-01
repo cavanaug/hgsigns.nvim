@@ -1,8 +1,9 @@
 local Hunks = require('hgsigns.hunks')
 
-local scheduler = require('hgsigns.async').schedule
-local config = require('hgsigns.config').config
-local git_command = require('hgsigns.git.cmd')
+local async = require('hgsigns.async')
+local scheduler = async.schedule
+
+local asystem = async.wrap(3, require('hgsigns.system').system)
 
 local M = {}
 
@@ -38,20 +39,21 @@ function M.run_diff(text_cmp, text_buf)
   write_to_file(file_buf, text_buf)
   write_to_file(file_cmp, text_cmp)
 
-  local opts = config.diff_opts
-  local out = git_command({
+  -- Use the system `diff` tool to compare the two temp files. Mercurial's
+  -- `hg diff` can only operate on paths inside a repository, so it cannot be
+  -- used to diff arbitrary temp files; the POSIX `diff -U0` output uses the
+  -- same `@@` unified-hunk format the parser below expects.
+  local obj = asystem({
     'diff',
-    '--color=never',
-    '--' .. (opts.indent_heuristic and '' or 'no-') .. 'indent-heuristic',
-    '--diff-algorithm=' .. opts.algorithm,
-    '--patch-with-raw',
-    '--unified=0',
+    '-U0',
     file_cmp,
     file_buf,
   }, {
-    -- git-diff implies --exit-code
-    ignore_error = true,
+    text = true,
   })
+  scheduler()
+
+  local out = vim.split(obj.stdout or '', '\n')
 
   for _, line in ipairs(out) do
     if vim.startswith(line, '@@') then

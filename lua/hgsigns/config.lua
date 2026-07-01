@@ -103,7 +103,6 @@ local validate = require('hgsigns.util').validate
 --- @field _refresh_staged_on_update boolean
 --- @field _threaded_diff boolean
 --- @field gh boolean
---- @field _git_version string
 --- @field _verbose boolean
 --- @field _test_mode boolean
 --- @field _allow_fs_poll_fallback boolean
@@ -740,14 +739,6 @@ M.schema = {
     description = [[
       Enable GitHub integration. This allows the following features:
       • `:Hgsigns blame_line` will show PR numbers (with a hyperlink)
-    ]],
-  },
-
-  _git_version = {
-    type = 'string',
-    default = 'auto',
-    description = [[
-      Version of hg available. Set to 'auto' to automatically detect.
     ]],
   },
 

@@ -30,47 +30,7 @@ No setup required.
 Optional configuration can be passed to the setup function. Here is an example
 with most of the default settings:
 >lua
-    require('hgsigns').setup {
-      signs = {
-        add          = { text = '┃' },
-        change       = { text = '┃' },
-        delete       = { text = '_' },
-        topdelete    = { text = '‾' },
-        changedelete = { text = '~' },
-        untracked    = { text = '┆' },
-      },
-      signcolumn = true,  -- Toggle with `:Hgsigns toggle_signs`
-      numhl      = false, -- Toggle with `:Hgsigns toggle_numhl`
-      linehl     = false, -- Toggle with `:Hgsigns toggle_linehl`
-      word_diff  = false, -- Toggle with `:Hgsigns toggle_word_diff`
-      watch_gitdir = {
-        follow_files = true
-      },
-      auto_attach = true,
-      attach_to_untracked = false,
-      current_line_blame = false, -- Toggle with `:Hgsigns toggle_current_line_blame`
-      current_line_blame_opts = {
-        virt_text = true,
-        virt_text_pos = 'eol', -- 'eol' | 'overlay' | 'right_align'
-        delay = 1000,
-        ignore_whitespace = false,
-        virt_text_priority = 100,
-        use_focus = true,
-      },
-      current_line_blame_formatter = '<author>, <author_time:%R> - <summary>',
-      blame_formatter = nil, -- Use default
-      sign_priority = 6,
-      update_debounce = 100,
-      status_formatter = nil, -- Use default
-      max_file_length = 40000, -- Disable if file is longer than this (in lines)
-      preview_config = {
-        -- Options passed to nvim_open_win
-        style = 'minimal',
-        relative = 'cursor',
-        row = 0,
-        col = 1
-      },
-    }
+
 <
 
 ==============================================================================
@@ -88,7 +48,7 @@ Note functions with the {async} attribute are run asynchronously and accept
 an optional {callback} argument.
 
 
-statuscolumn({bufnr}, {lnum})                         *hgsigns.statuscolumn()*
+statuscolumn({bufnr}, {lnum})                        *gitsigns.statuscolumn()*
 
     Parameters: ~
         {bufnr} (`integer?`): Buffer number. Defaults to current buffer.
@@ -98,14 +58,14 @@ statuscolumn({bufnr}, {lnum})                         *hgsigns.statuscolumn()*
     Returns: ~
         (`string`)
 
-setup({cfg})                                                 *hgsigns.setup()*
+setup({cfg})                                                *gitsigns.setup()*
     Setup and start Hgsigns.
 
     Parameters: ~
         {cfg} (`table?`): Configuration for Hgsigns.
               See |hgsigns-usage| for more details.
 
-refresh({callback})                                        *hgsigns.refresh()*
+refresh({callback})                                       *gitsigns.refresh()*
     Refresh all buffers.
 
     Attributes: ~
@@ -114,7 +74,7 @@ refresh({callback})                                        *hgsigns.refresh()*
     Parameters: ~
         {callback} (`(fun(err: string?))?`)
 
-get_actions()                                          *hgsigns.get_actions()*
+get_actions()                                         *gitsigns.get_actions()*
     Get all the available line specific actions for the current
     buffer at the cursor position.
 
@@ -122,7 +82,7 @@ get_actions()                                          *hgsigns.get_actions()*
         (`table?`): Dictionary of action name to function which when called
         performs action.
 
-setloclist({nr}, {target})                              *hgsigns.setloclist()*
+setloclist({nr}, {target})                             *gitsigns.setloclist()*
     Populate the location list with hunks. Automatically opens the
     location list window.
 
@@ -134,9 +94,9 @@ setloclist({nr}, {target})                              *hgsigns.setloclist()*
     Parameters: ~
         {nr}     (`(0|integer)?`): Window number or the |window-ID|.
                  `0` for the current window (default).
-        {target} (`(integer|"attached"|"all")?`): See |hgsigns.setqflist()|.
+        {target} (`(integer|"attached"|"all")?`): See |gitsigns.setqflist()|.
 
-setqflist({target}, {opts}, {callback})                  *hgsigns.setqflist()*
+setqflist({target}, {opts}, {callback})                 *gitsigns.setqflist()*
     Populate the quickfix list with hunks. Automatically opens the
     quickfix window.
 
@@ -165,7 +125,7 @@ setqflist({target}, {opts}, {callback})                  *hgsigns.setqflist()*
                      Open the quickfix/location list viewer. Defaults to `true`.
         {callback} (`(fun(err: string?))?`)
 
-show_commit({revision}, {open}, {callback})               *hgsigns.show_commit()*
+show_commit({revision}, {open}, {callback})              *gitsigns.show_commit()*
     Show revision {base} commit in split or tab
 
     Parameters: ~
@@ -173,7 +133,7 @@ show_commit({revision}, {open}, {callback})               *hgsigns.show_commit()
         {open}     (`("vsplit"|"tabnew")?`)
         {callback} (`(fun(err: string?))?`)
 
-show({revision}, {callback})                                  *hgsigns.show()*
+show({revision}, {callback})                                 *gitsigns.show()*
     Show revision {base} of the current file, if it is given, or
     with the currently set base (index by default).
 
@@ -200,7 +160,7 @@ show({revision}, {callback})                                  *hgsigns.show()*
         {revision} (`(string|"FILE")?`)
         {callback} (`(fun(err: string?))?`)
 
-diffthis({base}, {opts}, {callback})                      *hgsigns.diffthis()*
+diffthis({base}, {opts}, {callback})                     *gitsigns.diffthis()*
     Perform a |vimdiff| on the given file with {base} if it is
     given, or with the currently set base (index by default).
 
@@ -235,7 +195,7 @@ diffthis({base}, {opts}, {callback})                      *hgsigns.diffthis()*
                    (`("aboveleft"|"belowright"|"topleft"|"botright")?`)
         {callback} (`(fun(err: string?))?`)
 
-reset_base({global})                                    *hgsigns.reset_base()*
+reset_base({global})                                   *gitsigns.reset_base()*
     Reset the base revision to diff against back to the
     index.
 
@@ -244,7 +204,7 @@ reset_base({global})                                    *hgsigns.reset_base()*
     Parameters: ~
         {global} (`boolean?`): Change the base of all buffers.
 
-change_base({base}, {global}, {callback})               *hgsigns.change_base()*
+change_base({base}, {global}, {callback})              *gitsigns.change_base()*
     Change the base revision to diff against. If {base} is not
     given, then the original base is used. If {global} is given
     and true, then change the base revision of all buffers,
@@ -286,7 +246,7 @@ change_base({base}, {global}, {callback})               *hgsigns.change_base()*
         {global}   (`boolean?`): Change the base of all buffers.
         {callback} (`(fun(err: string?))?`)
 
-blame({opts}, {callback})                                    *hgsigns.blame()*
+blame({opts}, {callback})                                   *gitsigns.blame()*
     Run hg blame on the current file and open the results
     in a scroll-bound vertical split.
 
@@ -309,7 +269,7 @@ blame({opts}, {callback})                                    *hgsigns.blame()*
                      Extra options passed to `hg blame`.
         {callback} (`(fun(err: string?))?`)
 
-blame_line({opts}, {callback})                          *hgsigns.blame_line()*
+blame_line({opts}, {callback})                         *gitsigns.blame_line()*
     Run hg blame on the current line and show the results in a
     floating window. If already open, calling this will cause the
     window to get focus.
@@ -326,7 +286,7 @@ blame_line({opts}, {callback})                          *hgsigns.blame_line()*
                      Extra options passed to `hg blame`.
         {callback} (`(fun(err: string?))?`)
 
-get_hunks({bufnr})                                       *hgsigns.get_hunks()*
+get_hunks({bufnr})                                      *gitsigns.get_hunks()*
     Get hunk array for specified buffer.
 
     Parameters: ~
@@ -349,7 +309,7 @@ get_hunks({bufnr})                                       *hgsigns.get_hunks()*
           • `"start"`: Line number (1-based)
           • `"count"`: Line count
 
-select_hunk({opts})                                    *hgsigns.select_hunk()*
+select_hunk({opts})                                   *gitsigns.select_hunk()*
     Select the hunk under the cursor.
 
     Parameters: ~
@@ -358,18 +318,18 @@ select_hunk({opts})                                    *hgsigns.select_hunk()*
                  Operate on/select all contiguous hunks. Only useful if
                  'diff_opts' contains `linematch`. Defaults to `true`.
 
-preview_hunk_inline({callback})                *hgsigns.preview_hunk_inline()*
+preview_hunk_inline({callback})               *gitsigns.preview_hunk_inline()*
     Preview the hunk at the cursor position inline in the buffer.
 
     Parameters: ~
         {callback} (`(fun(err: string?))?`)
 
-preview_hunk()                                        *hgsigns.preview_hunk()*
+preview_hunk()                                       *gitsigns.preview_hunk()*
     Preview the hunk at the cursor position in a floating
     window. If the preview is already open, calling this
     will cause the window to get focus.
 
-prev_hunk({opts}, {callback})                            *hgsigns.prev_hunk()*
+prev_hunk({opts}, {callback})                           *gitsigns.prev_hunk()*
     DEPRECATED: use |hgsigns.nav_hunk()|
 
     Jump to the previous hunk in the current buffer. If a hunk preview
@@ -400,11 +360,9 @@ prev_hunk({opts}, {callback})                            *hgsigns.prev_hunk()*
                      hunk.
                    • {count}: (`integer`)
                      Number of times to advance. Defaults to |v:count1|.
-                   • {target}: (`("unstaged"|"staged"|"all")`)
-                     Which kinds of hunks to target. Defaults to `'unstaged'`.
         {callback} (`(fun(err: string?))?`)
 
-next_hunk({opts}, {callback})                            *hgsigns.next_hunk()*
+next_hunk({opts}, {callback})                           *gitsigns.next_hunk()*
     DEPRECATED: use |hgsigns.nav_hunk()|
 
     Jump to the next hunk in the current buffer. If a hunk preview
@@ -435,11 +393,9 @@ next_hunk({opts}, {callback})                            *hgsigns.next_hunk()*
                      hunk.
                    • {count}: (`integer`)
                      Number of times to advance. Defaults to |v:count1|.
-                   • {target}: (`("unstaged"|"staged"|"all")`)
-                     Which kinds of hunks to target. Defaults to `'unstaged'`.
         {callback} (`(fun(err: string?))?`)
 
-nav_hunk({direction}, {opts}, {callback})                  *hgsigns.nav_hunk()*
+nav_hunk({direction}, {opts}, {callback})                 *gitsigns.nav_hunk()*
     Jump to hunk in the current buffer. If a hunk preview
     (popup or inline) was previously opened, it will be re-opened
     at the next hunk.
@@ -469,10 +425,10 @@ nav_hunk({direction}, {opts}, {callback})                  *hgsigns.nav_hunk()*
                       Number of times to advance. Defaults to |v:count1|.
         {callback}  (`(fun(err: string?))?`)
 
-reset_buffer()                                        *hgsigns.reset_buffer()*
+reset_buffer()                                       *gitsigns.reset_buffer()*
     Reset the lines of all hunks in the buffer.
 
-reset_hunk({range}, {opts}, {callback})                 *hgsigns.reset_hunk()*
+reset_hunk({range}, {opts}, {callback})                *gitsigns.reset_hunk()*
     Reset the lines of the hunk at the cursor position, or all
     lines in the given range. If {range} is provided, all lines in
     the given range are reset. This supports partial-hunks,
@@ -491,7 +447,7 @@ reset_hunk({range}, {opts}, {callback})                 *hgsigns.reset_hunk()*
                      'diff_opts' contains `linematch`. Defaults to `true`.
         {callback} (`(fun(err: string?))?`)
 
-toggle_deleted({value})                             *hgsigns.toggle_deleted()*
+toggle_deleted({value})                            *gitsigns.toggle_deleted()*
     DEPRECATED: Use |hgsigns.preview_hunk_inline()|
 
     Toggle |hgsigns-config-show_deleted|
@@ -503,7 +459,7 @@ toggle_deleted({value})                             *hgsigns.toggle_deleted()*
     Returns: ~
         (`boolean`): Current value of |hgsigns-config-show_deleted|
 
-toggle_current_line_blame({value})       *hgsigns.toggle_current_line_blame()*
+toggle_current_line_blame({value})      *gitsigns.toggle_current_line_blame()*
     Toggle |hgsigns-config-current_line_blame|
 
     Parameters: ~
@@ -513,7 +469,7 @@ toggle_current_line_blame({value})       *hgsigns.toggle_current_line_blame()*
     Returns: ~
         (`boolean`): Current value of |hgsigns-config-current_line_blame|
 
-toggle_word_diff({value})                         *hgsigns.toggle_word_diff()*
+toggle_word_diff({value})                        *gitsigns.toggle_word_diff()*
     Toggle |hgsigns-config-word_diff|
 
     Parameters: ~
@@ -523,7 +479,7 @@ toggle_word_diff({value})                         *hgsigns.toggle_word_diff()*
     Returns: ~
         (`boolean`): Current value of |hgsigns-config-word_diff|
 
-toggle_linehl({value})                               *hgsigns.toggle_linehl()*
+toggle_linehl({value})                              *gitsigns.toggle_linehl()*
     Toggle |hgsigns-config-linehl|
 
     Parameters: ~
@@ -532,6 +488,26 @@ toggle_linehl({value})                               *hgsigns.toggle_linehl()*
 
     Returns: ~
         (`boolean`): Current value of |hgsigns-config-linehl|
+
+toggle_numhl({value})                                *gitsigns.toggle_numhl()*
+    Toggle |hgsigns-config-numhl|
+
+    Parameters: ~
+        {value} (`boolean?`): Value to set toggle. If `nil`
+                the toggle value is inverted.
+
+    Returns: ~
+        (`boolean`): Current value of |hgsigns-config-numhl|
+
+toggle_signs({value})                                *gitsigns.toggle_signs()*
+    Toggle |gitsigns-config-signbooleancolumn|
+
+    Parameters: ~
+        {value} (`boolean?`): Value to set toggle. If `nil`
+                the toggle value is inverted.
+
+    Returns: ~
+        (`boolean`): Current value of |hgsigns-config-signcolumn|
 
 attach({opts}, {callback})                                 *gitsigns.attach()*
     Attach Gitsigns to the buffer.
@@ -545,14 +521,14 @@ attach({opts}, {callback})                                 *gitsigns.attach()*
                      Buffer number. Defaults to current buffer.
                    • {ctx}: (`Hgsigns.GitContext?`)
                      Git context for git-object buffers.
-                     See |gitsigns-type-gitcontext|.
+                     See |hgsigns-type-gitcontext|.
                    • {trigger}: (`string?`)
                      Attach source used for logging and manual-attach checks.
                    • {force}: (`boolean?`)
                      Bypass auto-attach filters for this attach attempt.
         {callback} (`(fun(err: string?))?`)
 
-detach({bufnr})                                             *hgsigns.detach()*
+detach({bufnr})                                            *gitsigns.detach()*
     Detach Hgsigns from the buffer {bufnr}. If {bufnr} is not
     provided then the current buffer is used.
 
@@ -560,13 +536,13 @@ detach({bufnr})                                             *hgsigns.detach()*
         {bufnr} (`integer`): Buffer number
 
 detach_all()                                           *gitsigns.detach_all()*
-    Detach Gitsigns from all buffers it is attached to.
+    Detach Hgsigns from all buffers it is attached to.
 
 
 ==============================================================================
 TYPES                                                       *gitsigns-types*
 
-Hgsigns.GitContext                                 *gitsigns-type-gitcontext*
+Hgsigns.GitContext                                   *hgsigns-type-gitcontext*
 
     Fields: ~
         {file}     (`string`): Path to the file represented by the buffer.
@@ -578,7 +554,7 @@ Hgsigns.GitContext                                 *gitsigns-type-gitcontext*
 
 
 ==============================================================================
-CONFIGURATION                                                *hgsigns-config*
+CONFIGURATION                                                *gitsigns-config*
 
 This section describes the configuration fields which can be passed to
 |hgsigns.setup()|. Note fields of type `table` may be marked with extended
@@ -603,7 +579,7 @@ signs                                                   *hgsigns-config-signs*
       • `show_count` to enable showing count of hunk, e.g. number of deleted
         lines.
 
-    The GitSigns highlights `Hgsigns[kind][type]` are used for each kind of
+    The Hgsigns highlights `HgsignsSignKindType` are used for each kind of
     sign. E.g. 'add' signs use the highlights:
       • `HgsignsAdd`   (for normal text signs)
       • `HgsignsAddNr` (for signs when `config.numhl == true`)
@@ -937,9 +913,9 @@ current_line_blame_formatter_nc *hgsigns-config-current_line_blame_formatter_nc*
     String or function used to format the virtual text of
     |hgsigns-config-current_line_blame| for lines that aren't committed.
 
-    See |gitsigns-config-current_line_blame_formatter| for more information.
+    See |hgsigns-config-current_line_blame_formatter| for more information.
 
-blame_formatter                              *gitsigns-config-blame_formatter*
+blame_formatter                               *hgsigns-config-blame_formatter*
     Type: `string|function`, Default: nil (use built-in layout)
 
     String or function used to format commit header lines in the
@@ -978,6 +954,12 @@ trouble                                               *hgsigns-config-trouble*
     When using setqflist() or setloclist(), open Trouble instead of the
     quickfix/location list window.
 
+gh                                                         *hgsigns-config-gh*
+    Type: `boolean`, Default: `false`
+
+    Enable GitHub integration. This allows the following features:
+    • `:Hgsigns blame_line` will show PR numbers (with a hyperlink)
+
 word_diff                                           *hgsigns-config-word_diff*
     Type: `boolean`, Default: `false`
 
@@ -1012,178 +994,178 @@ These are the highlights groups used by Hgsigns.
 Note if a highlight is not defined, it will be automatically derived by
 searching for other defined highlights in order.
 
-                                                        *hl-GitSignsAdd*
-GitSignsAdd
+                                                        *hl-HgsignsAdd*
+HgsignsAdd
     Used for the text of 'add' signs.
 
-    Fallbacks: 
-                                                        *hl-GitSignsChange*
-GitSignsChange
+    Fallbacks: `Added`, `DiffAdd`
+                                                        *hl-HgsignsChange*
+HgsignsChange
     Used for the text of 'change' signs.
 
-    Fallbacks: 
-                                                        *hl-GitSignsDelete*
-GitSignsDelete
+    Fallbacks: `Changed`, `DiffChange`
+                                                        *hl-HgsignsDelete*
+HgsignsDelete
     Used for the text of 'delete' signs.
 
-    Fallbacks: 
-                                                        *hl-GitSignsChangedelete*
-GitSignsChangedelete
+    Fallbacks: `Removed`, `DiffDelete`
+                                                        *hl-HgsignsChangedelete*
+HgsignsChangedelete
     Used for the text of 'changedelete' signs.
 
-    Fallbacks: 
-                                                        *hl-GitSignsTopdelete*
-GitSignsTopdelete
+    Fallbacks: `HgsignsChange`
+                                                        *hl-HgsignsTopdelete*
+HgsignsTopdelete
     Used for the text of 'topdelete' signs.
 
-    Fallbacks: 
-                                                        *hl-GitSignsUntracked*
-GitSignsUntracked
+    Fallbacks: `HgsignsDelete`
+                                                        *hl-HgsignsUntracked*
+HgsignsUntracked
     Used for the text of 'untracked' signs.
 
-    Fallbacks: 
-                                                        *hl-GitSignsAddNr*
-GitSignsAddNr
+    Fallbacks: `HgsignsAdd`
+                                                        *hl-HgsignsAddNr*
+HgsignsAddNr
     Used for number column (when `config.numhl == true`) of 'add' signs.
 
-    Fallbacks: 
-                                                        *hl-GitSignsChangeNr*
-GitSignsChangeNr
+    Fallbacks: `HgsignsAdd`
+                                                        *hl-HgsignsChangeNr*
+HgsignsChangeNr
     Used for number column (when `config.numhl == true`) of 'change' signs.
 
-    Fallbacks: 
-                                                        *hl-GitSignsDeleteNr*
-GitSignsDeleteNr
+    Fallbacks: `HgsignsChange`
+                                                        *hl-HgsignsDeleteNr*
+HgsignsDeleteNr
     Used for number column (when `config.numhl == true`) of 'delete' signs.
 
-    Fallbacks: 
-                                                        *hl-GitSignsChangedeleteNr*
-GitSignsChangedeleteNr
+    Fallbacks: `HgsignsDelete`
+                                                        *hl-HgsignsChangedeleteNr*
+HgsignsChangedeleteNr
     Used for number column (when `config.numhl == true`) of 'changedelete' signs.
 
-    Fallbacks: 
-                                                        *hl-GitSignsTopdeleteNr*
-GitSignsTopdeleteNr
+    Fallbacks: `HgsignsChangeNr`
+                                                        *hl-HgsignsTopdeleteNr*
+HgsignsTopdeleteNr
     Used for number column (when `config.numhl == true`) of 'topdelete' signs.
 
-    Fallbacks: 
-                                                        *hl-GitSignsUntrackedNr*
-GitSignsUntrackedNr
+    Fallbacks: `HgsignsDeleteNr`
+                                                        *hl-HgsignsUntrackedNr*
+HgsignsUntrackedNr
     Used for number column (when `config.numhl == true`) of 'untracked' signs.
 
-    Fallbacks: 
-                                                        *hl-GitSignsAddLn*
-GitSignsAddLn
+    Fallbacks: `HgsignsAddNr`
+                                                        *hl-HgsignsAddLn*
+HgsignsAddLn
     Used for buffer line (when `config.linehl == true`) of 'add' signs.
 
-    Fallbacks: 
-                                                        *hl-GitSignsChangeLn*
-GitSignsChangeLn
+    Fallbacks: `DiffAdd`
+                                                        *hl-HgsignsChangeLn*
+HgsignsChangeLn
     Used for buffer line (when `config.linehl == true`) of 'change' signs.
 
-    Fallbacks: 
-                                                        *hl-GitSignsChangedeleteLn*
-GitSignsChangedeleteLn
+    Fallbacks: `DiffChange`
+                                                        *hl-HgsignsChangedeleteLn*
+HgsignsChangedeleteLn
     Used for buffer line (when `config.linehl == true`) of 'changedelete' signs.
 
-    Fallbacks: 
-                                                        *hl-GitSignsUntrackedLn*
-GitSignsUntrackedLn
+    Fallbacks: `HgsignsChangeLn`
+                                                        *hl-HgsignsUntrackedLn*
+HgsignsUntrackedLn
     Used for buffer line (when `config.linehl == true`) of 'untracked' signs.
 
-    Fallbacks: 
-                                                        *hl-GitSignsAddCul*
-GitSignsAddCul
+    Fallbacks: `HgsignsAddLn`
+                                                        *hl-HgsignsAddCul*
+HgsignsAddCul
     Used for the text (when the cursor is on the same line as the sign) of 'add' signs.
 
-    Fallbacks: 
-                                                        *hl-GitSignsChangeCul*
-GitSignsChangeCul
+    Fallbacks: `HgsignsAdd`
+                                                        *hl-HgsignsChangeCul*
+HgsignsChangeCul
     Used for the text (when the cursor is on the same line as the sign) of 'change' signs.
 
-    Fallbacks: 
-                                                        *hl-GitSignsDeleteCul*
-GitSignsDeleteCul
+    Fallbacks: `HgsignsChange`
+                                                        *hl-HgsignsDeleteCul*
+HgsignsDeleteCul
     Used for the text (when the cursor is on the same line as the sign) of 'delete' signs.
 
-    Fallbacks: 
-                                                        *hl-GitSignsChangedeleteCul*
-GitSignsChangedeleteCul
+    Fallbacks: `HgsignsDelete`
+                                                        *hl-HgsignsChangedeleteCul*
+HgsignsChangedeleteCul
     Used for the text (when the cursor is on the same line as the sign) of 'changedelete' signs.
 
-    Fallbacks: 
-                                                        *hl-GitSignsTopdeleteCul*
-GitSignsTopdeleteCul
+    Fallbacks: `HgsignsChangeCul`
+                                                        *hl-HgsignsTopdeleteCul*
+HgsignsTopdeleteCul
     Used for the text (when the cursor is on the same line as the sign) of 'topdelete' signs.
 
-    Fallbacks: 
-                                                        *hl-GitSignsUntrackedCul*
-GitSignsUntrackedCul
+    Fallbacks: `HgsignsDeleteCul`
+                                                        *hl-HgsignsUntrackedCul*
+HgsignsUntrackedCul
     Used for the text (when the cursor is on the same line as the sign) of 'untracked' signs.
 
-    Fallbacks: 
-                                                        *hl-GitSignsAddPreview*
-GitSignsAddPreview
+    Fallbacks: `HgsignsAddCul`
+                                                        *hl-HgsignsAddPreview*
+HgsignsAddPreview
     Used for added lines in previews.
 
     Fallbacks: 
-                                                        *hl-GitSignsDeletePreview*
-GitSignsDeletePreview
+                                                        *hl-HgsignsDeletePreview*
+HgsignsDeletePreview
     Used for deleted lines in previews.
 
     Fallbacks: 
-                                                        *hl-GitSignsNoEOLPreview*
-GitSignsNoEOLPreview
+                                                        *hl-HgsignsNoEOLPreview*
+HgsignsNoEOLPreview
     Used for "No newline at end of file".
 
     Fallbacks: 
-                                                        *hl-GitSignsCurrentLineBlame*
-GitSignsCurrentLineBlame
+                                                        *hl-HgsignsCurrentLineBlame*
+HgsignsCurrentLineBlame
     Used for current line blame.
 
-    Fallbacks: 
-                                                        *hl-GitSignsAddInline*
-GitSignsAddInline
+    Fallbacks: `NonText`
+                                                        *hl-HgsignsAddInline*
+HgsignsAddInline
     Used for added word diff regions in inline previews.
 
     Fallbacks: 
-                                                        *hl-GitSignsDeleteInline*
-GitSignsDeleteInline
+                                                        *hl-HgsignsDeleteInline*
+HgsignsDeleteInline
     Used for deleted word diff regions in inline previews.
 
     Fallbacks: 
-                                                        *hl-GitSignsChangeInline*
-GitSignsChangeInline
+                                                        *hl-HgsignsChangeInline*
+HgsignsChangeInline
     Used for changed word diff regions in inline previews.
 
     Fallbacks: 
-                                                        *hl-GitSignsAddLnInline*
-GitSignsAddLnInline
+                                                        *hl-HgsignsAddLnInline*
+HgsignsAddLnInline
     Used for added word diff regions when `config.word_diff == true`.
 
     Fallbacks: 
-                                                        *hl-GitSignsChangeLnInline*
-GitSignsChangeLnInline
+                                                        *hl-HgsignsChangeLnInline*
+HgsignsChangeLnInline
     Used for changed word diff regions when `config.word_diff == true`.
 
     Fallbacks: 
-                                                        *hl-GitSignsDeleteLnInline*
-GitSignsDeleteLnInline
+                                                        *hl-HgsignsDeleteLnInline*
+HgsignsDeleteLnInline
     Used for deleted word diff regions when `config.word_diff == true`.
 
     Fallbacks: 
-                                                        *hl-GitSignsDeleteVirtLn*
-GitSignsDeleteVirtLn
+                                                        *hl-HgsignsDeleteVirtLn*
+HgsignsDeleteVirtLn
     Used for deleted lines shown by inline `preview_hunk_inline()` or `show_deleted()`.
 
     Fallbacks: 
-                                                        *hl-GitSignsDeleteVirtLnInLine*
-GitSignsDeleteVirtLnInLine
+                                                        *hl-HgsignsDeleteVirtLnInLine*
+HgsignsDeleteVirtLnInLine
     Used for word diff regions in lines shown by inline `preview_hunk_inline()` or `show_deleted()`.
 
     Fallbacks: 
-                                                        *hl-GitSignsVirtLnum*
-GitSignsVirtLnum
+                                                        *hl-HgsignsVirtLnum*
+HgsignsVirtLnum
     Used for line numbers in inline hunks previews.
 
     Fallbacks: 

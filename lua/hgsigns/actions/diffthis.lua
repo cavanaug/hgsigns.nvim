@@ -19,7 +19,7 @@ local M = {}
 --- @param relpath string?
 local function bufread(bufnr, dbufnr, base, relpath)
   local bcache = assert(cache[bufnr])
-  base = util.norm_base(base, bcache.git_obj.repo.vcs)
+  base = util.norm_base(base)
   local text --- @type string[]
   if base == bcache.git_obj.revision then
     text = assert(bcache.compare_text)
@@ -63,7 +63,7 @@ end
 --- @return integer? bufnr Buffer number
 local function create_revision_buf(bufnr, base, relpath)
   local bcache = assert(cache[bufnr])
-  base = util.norm_base(base, bcache.git_obj.repo.vcs)
+  base = util.norm_base(base)
 
   local bufname = bcache:get_rev_bufname(base, relpath)
 

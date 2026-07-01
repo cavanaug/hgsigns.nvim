@@ -90,11 +90,6 @@ function CacheEntry:wait_for_hunks()
   end
 end
 
--- If a file contains has up to this amount of lines, then
--- always blame the whole file, otherwise only blame one line
--- at a time.
-local BLAME_THRESHOLD_LEN = 10000
-
 --- @param blame table<integer,Hgsigns.BlameInfo?>
 --- @param hunks? Hgsigns.Hunk.Hunk[]
 --- @param relpath string
@@ -120,38 +115,29 @@ end
 
 --- @async
 --- @private
---- @param lnum? integer|[integer, integer]
+--- @param _lnum? integer|[integer, integer]
 --- @param opts? Hgsigns.BlameOpts
 --- @return table<integer,Hgsigns.BlameInfo?>
 --- @return table<string,Hgsigns.CommitInfo?>
 --- @return boolean? full
-function CacheEntry:run_blame(lnum, opts)
+function CacheEntry:run_blame(_lnum, opts)
   local bufnr = self.bufnr
 
-  -- Always send contents if buffer represents an editable file on disk.
-  -- Otherwise do not sent contents buffer revision is from tree and git version
-  -- is below 2.41.
-  --
-  -- This avoids the error:
-  --   "fatal: cannot use --contents with final commit object name"
+  -- Send buffer contents when the buffer represents an editable file on disk so
+  -- that unsaved changes are blamed against the working copy.
   local send_contents = vim.bo[bufnr].buftype == ''
-    or (not self.git_obj:from_tree() and not require('hgsigns.git.version').check(2, 41))
 
   while true do
     local contents = send_contents and util.buf_lines(bufnr) or nil
     local tick = vim.b[bufnr].changedtick
-    local lnum0 = self.git_obj.repo.vcs ~= 'hg'
-        and api.nvim_buf_line_count(bufnr) > BLAME_THRESHOLD_LEN
-        and lnum
-      or nil
     -- TODO(lewis6991): Cancel blame on changedtick
-    local blame, commits = self.git_obj:run_blame(contents, lnum0, self.git_obj.revision, opts)
+    local blame, commits = self.git_obj:run_blame(contents, nil, self.git_obj.revision, opts)
     async.schedule()
     if not api.nvim_buf_is_valid(bufnr) then
       return {}, {}
     end
     if vim.b[bufnr].changedtick == tick then
-      return blame, commits, lnum0 == nil
+      return blame, commits, true
     end
   end
   error('unreachable')
@@ -201,51 +187,16 @@ function CacheEntry:get_blame(lnum, opts)
   if not blame or not blame_valid then
     self:wait_for_hunks()
     blame = blame or { entries = {} }
-    local Hunks = require('hgsigns.hunks')
-    local has_blameable_line = true
-    if lnum then
-      local start_lnum = type(lnum) == 'table' and lnum[1] or lnum
-      local end_lnum = type(lnum) == 'table' and lnum[2] or lnum
-      for curr_lnum = start_lnum, end_lnum do
-        has_blameable_line = not Hunks.find_hunk(curr_lnum, self.hunks)
-        if has_blameable_line then
-          break
-        end
-      end
+    -- Refresh/update cache
+    local b, commits = self:run_blame(lnum, opts)
+    local relpath = assert(self.git_obj.relpath)
+    if not overlay_hunk_blame(b, self.hunks, relpath) then
+      self.blame = nil
+      self.commits = nil
+      error('Malformed hunk data during mercurial blame overlay')
     end
-    if lnum and not has_blameable_line and self.git_obj.repo.vcs ~= 'hg' then
-      --- Bypass running blame (which can be expensive) if we know lnum is in a hunk
-      local Blame = require('hgsigns.git.blame')
-      local relpath = assert(self.git_obj.relpath)
-      local start_lnum = type(lnum) == 'table' and lnum[1] or lnum
-      local end_lnum = type(lnum) == 'table' and lnum[2] or lnum
-      for curr_lnum = start_lnum, end_lnum do
-        local info = Blame.get_blame_nc(relpath, curr_lnum)
-        blame.entries[curr_lnum] = info
-        blame.max_time = info.commit.author_time
-      end
-    else
-      -- Refresh/update cache
-      local b, commits, full = self:run_blame(lnum, opts)
-      if self.git_obj.repo.vcs == 'hg' then
-        local relpath = assert(self.git_obj.relpath)
-        if not overlay_hunk_blame(b, self.hunks, relpath) then
-          self.blame = nil
-          self.commits = nil
-          error('Malformed hunk data during mercurial blame overlay')
-        end
-      end
-      self.commits = vim.tbl_extend('force', self.commits or {}, commits)
-      if lnum and not full then
-        local start_lnum = type(lnum) == 'table' and lnum[1] or lnum
-        local end_lnum = type(lnum) == 'table' and lnum[2] or lnum
-        for curr_lnum = start_lnum, end_lnum do
-          blame.entries[curr_lnum] = b[curr_lnum]
-        end
-      else
-        blame.entries = b
-      end
-    end
+    self.commits = vim.tbl_extend('force', self.commits or {}, commits)
+    blame.entries = b
     self.blame = blame
   end
 

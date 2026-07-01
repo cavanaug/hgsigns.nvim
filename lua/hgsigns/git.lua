@@ -40,7 +40,7 @@ M.Obj = Obj
 --- @param revision? string
 --- @return string? err
 function Obj:change_revision(revision)
-  self.revision = util.norm_base(revision, self.repo.vcs)
+  self.revision = util.norm_base(revision)
   return self:refresh()
 end
 
@@ -98,10 +98,6 @@ function Obj:is_untracked()
   return self.file_state == nil or self.file_state == 'unknown'
 end
 
-function Obj:has_staging_area()
-  return self.repo.vcs == 'git'
-end
-
 --- @async
 --- @param revision? string
 --- @param relpath? string
@@ -126,12 +122,10 @@ function Obj:get_show_text(revision, relpath)
   if revision then
     --- @cast relpath -?
     stdout, stderr = self.repo:get_show_text_at_revision(revision, relpath, self.encoding)
-  elseif self.repo.vcs == 'hg' then
+  else
     --- @cast relpath -?
     stdout, stderr =
       self.repo:get_show_text_at_revision(assert(self.object_name), relpath, self.encoding)
-  else
-    stdout, stderr = self.repo:get_show_text(assert(self.object_name), self.encoding)
   end
 
   return stdout, stderr
@@ -164,12 +158,7 @@ function Obj.new(file, revision, encoding, gitdir, toplevel)
   local repo, err = Repo.get(cwd, gitdir, toplevel)
   if not repo then
     log.dprint('Not in hg repo')
-    if
-      err
-      and not err:match(errors.e.not_in_git)
-      and not err:match(errors.e.not_in_hg)
-      and not err:match(errors.e.worktree)
-    then
+    if err and not err:match(errors.e.not_in_hg) then
       log.eprint(err)
     end
     return
@@ -178,9 +167,8 @@ function Obj.new(file, revision, encoding, gitdir, toplevel)
   if vim.startswith(vim.fn.fnamemodify(file, ':p'), vim.fn.fnamemodify(repo.gitdir, ':p')) then
     -- Normally this check would be caught (unintended) in the above
     -- block, as gitdir resolution will fail if `file` is inside a gitdir.
-    -- If gitdir is explicitly passed (or set in the env with GIT_DIR)
-    -- then resolution will succeed, but we still don't want to
-    -- attach if `file` is inside the gitdir.
+    -- If gitdir is explicitly passed then resolution will succeed, but we
+    -- still don't want to attach if `file` is inside the .hg dir.
     log.dprint('In hgdir')
     repo:unref()
     return
@@ -189,7 +177,7 @@ function Obj.new(file, revision, encoding, gitdir, toplevel)
   -- When passing gitdir and toplevel, suppress stderr when resolving the file
   local silent = gitdir ~= nil and toplevel ~= nil
 
-  revision = util.norm_base(revision, repo.vcs)
+  revision = util.norm_base(revision)
 
   local info, err2 = repo:file_info(file, revision)
 

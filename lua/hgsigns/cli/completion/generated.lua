@@ -57,7 +57,6 @@ return {
         greedy = false,
         navigation_message = false,
         preview = false,
-        target = { 'unstaged', 'staged', 'all' },
         wrap = false,
       },
       positional = {
@@ -75,7 +74,6 @@ return {
         greedy = false,
         navigation_message = false,
         preview = false,
-        target = { 'unstaged', 'staged', 'all' },
         wrap = false,
       },
     },
@@ -86,7 +84,6 @@ return {
         greedy = false,
         navigation_message = false,
         preview = false,
-        target = { 'unstaged', 'staged', 'all' },
         wrap = false,
       },
     },

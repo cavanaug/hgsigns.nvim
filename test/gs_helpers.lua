@@ -120,8 +120,6 @@ local scratch_session = scratch_root
   .. '-'
   .. tostring(uv.hrtime())
 local scratch_seq = 0
-local empty_git_repo_seed = scratch_session .. '/seed-git-empty'
-local default_git_repo_seed = scratch_session .. '/seed-git-default'
 local empty_hg_repo_seed = scratch_session .. '/seed-hg-empty'
 local default_hg_repo_seed = scratch_session .. '/seed-hg-default'
 
@@ -211,13 +209,6 @@ local function hg_cmd(cwd)
   return cmd
 end
 
---- Run a git command
---- @param ... string
-function M.git(...)
-  local args = normalize_repo_args({ ... }) --- @type string[]
-  system(vim.list_extend({ 'git', '-C', M.scratch }, args))
-end
-
 --- Run a mercurial command
 --- @param ... string
 function M.hg(...)
@@ -230,49 +221,6 @@ end
 local function system_ok(cmd, errmsg)
   local output = system(cmd)
   eq(0, exec_lua('return vim.v.shell_error'), ('%s\n%s'):format(errmsg, output))
-end
-
---- @param path string
---- @param ... string
-local function git_in(path, ...)
-  system_ok(
-    vim.list_extend({ 'git', '-C', path }, { ... }),
-    ('git command failed in %s'):format(path)
-  )
-end
-
-local function configure_git_repo(path)
-  -- Always force color to test settings don't interfere with hgsigns system
-  -- commands (addresses #23).
-  git_in(path, 'config', 'color.branch', 'always')
-  git_in(path, 'config', 'color.ui', 'always')
-  git_in(path, 'config', 'color.diff', 'always')
-  git_in(path, 'config', 'color.interactive', 'always')
-  git_in(path, 'config', 'color.status', 'always')
-  git_in(path, 'config', 'color.grep', 'always')
-  git_in(path, 'config', 'color.pager', 'true')
-  git_in(path, 'config', 'color.decorate', 'always')
-  git_in(path, 'config', 'color.showbranch', 'always')
-  git_in(path, 'config', 'core.autocrlf', 'false')
-  git_in(path, 'config', 'core.eol', 'lf')
-
-  git_in(path, 'config', 'merge.conflictStyle', 'merge')
-
-  git_in(path, 'config', 'user.email', 'tester@com.com')
-  git_in(path, 'config', 'user.name', 'tester')
-
-  git_in(path, 'config', 'init.defaultBranch', 'main')
-end
-
---- @param path string
-local function init_git_repo(path)
-  if local_exists(path) then
-    local_delete(path)
-  end
-
-  M.mkdir(path)
-  git_in(path, 'init', '-b', 'main')
-  configure_git_repo(path)
 end
 
 --- @param path string
@@ -342,25 +290,6 @@ local function copy_dir(src, dst)
   end
 
   system_ok({ 'cp', '-R', src, dst }, ('failed to copy %s to %s'):format(src, dst))
-end
-
---- @return string
-local function ensure_empty_git_repo_seed()
-  if not local_exists(empty_git_repo_seed) then
-    init_git_repo(empty_git_repo_seed)
-  end
-  return empty_git_repo_seed
-end
-
---- @return string
-local function ensure_default_git_repo_seed()
-  if not local_exists(default_git_repo_seed) then
-    copy_dir(ensure_empty_git_repo_seed(), default_git_repo_seed)
-    M.write_to_file(default_git_repo_seed .. '/dummy.txt', test_file_text)
-    git_in(default_git_repo_seed, 'add', 'dummy.txt')
-    git_in(default_git_repo_seed, 'commit', '-m', 'init commit')
-  end
-  return default_git_repo_seed
 end
 
 --- @return string
@@ -506,33 +435,9 @@ function M.path_pattern(path)
   return pattern
 end
 
-function M.git_init_scratch()
-  M.cleanup()
-  copy_dir(ensure_empty_git_repo_seed(), M.scratch)
-end
-
 function M.hg_init_scratch()
   M.cleanup()
   copy_dir(ensure_empty_hg_repo_seed(), M.scratch)
-end
-
---- Setup a basic git repository in directory `helpers.scratch` with a single file
---- `helpers.test_file` committed.
---- @param opts? {test_file_text?: string[], no_add?: boolean}
-function M.setup_test_repo(opts)
-  local text = opts and opts.test_file_text or test_file_text
-  if not (opts and opts.no_add) and vim.deep_equal(text, test_file_text) then
-    M.cleanup()
-    copy_dir(ensure_default_git_repo_seed(), M.scratch)
-    return
-  end
-
-  M.git_init_scratch()
-  M.write_to_file(M.test_file, text)
-  if not (opts and opts.no_add) then
-    M.git('add', M.test_file)
-    M.git('commit', '-m', 'init commit')
-  end
 end
 
 --- Setup a basic hg repository in directory `helpers.scratch` with a single file

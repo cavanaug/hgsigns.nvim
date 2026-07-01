@@ -22,19 +22,18 @@ describe('git locale', function()
 
     helpers.exec_lua(function()
       package.loaded['hgsigns.git.cmd'] = nil
-      local orig_git_cmd = require('hgsigns.git.cmd')
+      local orig_hg_cmd = require('hgsigns.git.cmd')
 
       _G.hgsigns_git_envs = {}
 
       package.loaded['hgsigns.git.cmd'] = function(args, spec)
         spec = spec or {}
 
-        local stdout, stderr, code = orig_git_cmd(args, spec)
+        local stdout, stderr, code = orig_hg_cmd(args, spec)
 
         _G.hgsigns_git_envs[#_G.hgsigns_git_envs + 1] = {
           args = vim.deepcopy(args),
           env = vim.deepcopy(spec.env or {}),
-          vcs = spec.vcs or 'git',
         }
 
         return stdout, stderr, code
@@ -71,12 +70,10 @@ describe('git locale', function()
 
     local saw_hg = false
     for _, item in ipairs(envs) do
-      if item.vcs == 'hg' then
-        saw_hg = true
-        eq('1', item.env.HGPLAIN)
-        eq('C', item.env.LC_ALL)
-        eq('C', item.env.LANGUAGE)
-      end
+      saw_hg = true
+      eq('1', item.env.HGPLAIN)
+      eq('C', item.env.LC_ALL)
+      eq('C', item.env.LANGUAGE)
     end
     eq(true, saw_hg)
 
@@ -94,18 +91,13 @@ describe('git locale', function()
       }
     end)
 
-    local saw_completion_git = false
+    -- Every command the completion path runs must be a stabilized hg command.
     for _, item in ipairs(completion_result.calls) do
-      if item.vcs == 'hg' then
-        eq('1', item.env.HGPLAIN)
-        eq('C', item.env.LC_ALL)
-        eq('C', item.env.LANGUAGE)
-      elseif item.vcs == 'git' then
-        saw_completion_git = true
-      end
+      eq('1', item.env.HGPLAIN)
+      eq('C', item.env.LC_ALL)
+      eq('C', item.env.LANGUAGE)
     end
 
-    eq(false, saw_completion_git)
     eq(true, vim.tbl_contains(completion_result.items, '.'))
 
     local saw_hg_config = false

@@ -971,7 +971,8 @@ end
 
 --- @return string
 local function get_setup_from_readme()
-  local readme = io.lines(root .. '/README.md') --- @type Iterator[string]
+  local file = assert(io.open(root .. '/README.md', 'r'))
+  local readme = file:lines() --- @type Iterator[string]
   local res = {} --- @type string[]
 
   local function append(line)
@@ -991,6 +992,8 @@ local function get_setup_from_readme()
       break
     end
   end
+
+  file:close()
 
   return table.concat(res, '\n')
 end

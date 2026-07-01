@@ -160,19 +160,7 @@ local function handle_moved(bufnr, old_relpath)
     dprintf('File moved to %s', new_name)
     git_obj.relpath = new_name
     git_obj.file = git_obj.repo.toplevel .. '/' .. new_name
-  elseif git_obj.repo.vcs == 'hg' then
-    return
-  elseif git_obj.orig_relpath then
-    local orig_file = Path.join(git_obj.repo.toplevel, git_obj.orig_relpath)
-    if not git_obj.repo:file_info(orig_file, git_obj.revision) then
-      return
-    end
-    --- File was moved in the index, but then reset
-    dprintf('Moved file reset')
-    git_obj.relpath = git_obj.orig_relpath
-    git_obj.orig_relpath = nil
   else
-    -- File removed from index, do nothing
     return
   end
 
@@ -211,13 +199,10 @@ local function repo_update_handler(bufnr)
 
   local git_obj = bcache.git_obj
 
-  if git_obj.repo.vcs == 'hg' then
-    local info =
-      git.Repo.get_info(git_obj.repo.toplevel, git_obj.repo.gitdir, git_obj.repo.toplevel)
-    if info then
-      git_obj.repo.abbrev_head = info.abbrev_head
-      git_obj.repo.head_oid = info.head_oid
-    end
+  local info = git.Repo.get_info(git_obj.repo.toplevel, git_obj.repo.gitdir, git_obj.repo.toplevel)
+  if info then
+    git_obj.repo.abbrev_head = info.abbrev_head
+    git_obj.repo.head_oid = info.head_oid
   end
 
   Status.update(bufnr, { head = git_obj.repo.abbrev_head })
@@ -257,7 +242,7 @@ local function repo_update_handler(bufnr)
   if
     config.watch_gitdir.follow_files
     and was_tracked
-    and (git_obj:is_untracked() or (git_obj.repo.vcs == 'hg' and git_obj.file_state == 'removed'))
+    and (git_obj:is_untracked() or git_obj.file_state == 'removed')
   then
     -- File was tracked but is no longer available at its old path. Check if it
     -- was moved and switch to it.

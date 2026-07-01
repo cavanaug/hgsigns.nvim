@@ -603,8 +603,7 @@ function M.change_base(base, global, callback)
   async_run(callback, function()
     local bufnr = current_buf()
     local bcache = cache[bufnr]
-    local vcs = bcache and bcache.git_obj.repo.vcs or 'hg'
-    base = util.norm_base(base, vcs)
+    base = util.norm_base(base)
 
     if global then
       config.base = base

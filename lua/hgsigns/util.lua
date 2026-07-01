@@ -294,21 +294,32 @@ function M.strip_cr(xs0)
   return xs
 end
 
---- @param vcs? 'git'|'hg'
+--- The default revision for Mercurial actions: the working-copy parent.
 --- @return string
-function M.default_revision(vcs)
-  return vcs == 'hg' and '.' or 'HEAD'
+function M.default_revision()
+  return '.'
 end
 
+--- Normalize a user-supplied base revision into a valid Mercurial revset.
+---
+--- Bare relative refs are interpreted against the working-copy parent (`.`):
+---   `~`   -> `.~1`   (a lone `~` means one generation back, like git `HEAD~`)
+---   `~N`  -> `.~N`
+---   `^`   -> `.^`
+---   `^N`  -> `.^N`
 --- @param base? string
---- @param vcs? 'git'|'hg'
 --- @return string?
-function M.norm_base(base, vcs)
+function M.norm_base(base)
   if base == ':0' then
     return
   end
-  if base and base:sub(1, 1):match('[~\\^]') then
-    base = M.default_revision(vcs) .. base
+  if base and base:sub(1, 1):match('[~%^]') then
+    -- A lone `~` (not followed by a number) is `~1` in git terms; Mercurial
+    -- requires the explicit generation count (`.~` alone is a parse error).
+    if base == '~' then
+      base = '~1'
+    end
+    base = M.default_revision() .. base
   end
   return base
 end

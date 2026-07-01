@@ -6,64 +6,39 @@ local asystem = async.wrap(3, require('hgsigns.system').system)
 
 --- @class Hgsigns.Git.JobSpec : vim.SystemOpts
 --- @field ignore_error? boolean
---- @field vcs? 'git'|'hg'
 
+--- Run a Mercurial command with the stabilization environment required by this
+--- plugin. `HGPLAIN=1` and `LC_ALL=C`/`LANGUAGE=C` force deterministic,
+--- locale-independent output; `--config ui.relative-paths=false` forces
+--- absolute paths even when the user's hgrc enables relative paths (HGPLAIN
+--- does not cover that setting).
 --- @async
 --- @param args string[]
 --- @param spec? Hgsigns.Git.JobSpec
 --- @return string[] stdout, string? stderr, integer code
-local function git_command(args, spec)
+local function hg_command(args, spec)
   spec = spec or {}
   if spec.cwd then
     -- cwd must be a windows path and not a unix path
     spec.cwd = util.cygpath(spec.cwd)
   end
 
-  local vcs = spec.vcs or 'git'
-
-  local cmd
-  if vcs == 'hg' then
-    cmd = {
-      'hg',
-      '--config',
-      'ui.relative-paths=false',
-    }
-  else
-    cmd = {
-      'git',
-      '--no-pager',
-      '--no-optional-locks',
-      '--literal-pathspecs',
-      '-c',
-      'gc.auto=0', -- Disable auto-packing which emits messages to stderr
-      '-c',
-      'core.quotepath=off',
-      '-c',
-      'color.ui=false',
-      '-c',
-      'color.diff=false',
-    }
-  end
+  local cmd = {
+    'hg',
+    '--config',
+    'ui.relative-paths=false',
+  }
   vim.list_extend(cmd, args)
 
   if spec.text == nil then
     spec.text = true
   end
 
-  if vcs == 'hg' then
-    spec.env = vim.tbl_extend('force', spec.env or {}, {
-      HGPLAIN = '1',
-      LC_ALL = 'C',
-      LANGUAGE = 'C',
-    })
-  else
-    -- Force English messages for git output parsing.
-    -- Git translations can cause our stderr pattern matching to fail.
-    spec.env = vim.tbl_extend('force', spec.env or {}, {
-      LC_ALL = 'C',
-      LANGUAGE = 'C',
-    })
-  end
+  spec.env = vim.tbl_extend('force', spec.env or {}, {
+    HGPLAIN = '1',
+    LC_ALL = 'C',
+    LANGUAGE = 'C',
+  })
 
   --- @type vim.SystemCompleted
   local obj = asystem(cmd, spec)
@@ -102,4 +77,4 @@ local function git_command(args, spec)
   return stdout_lines, obj.stderr, obj.code
 end
 
-return git_command
+return hg_command

@@ -158,13 +158,13 @@ Git or Mercurial repository.
 
 This sibling relationship has two concrete implications:
 
-1. **Highlight groups** — hgsigns reuses the `GitSigns*` highlight groups
-   defined by gitsigns rather than introducing its own `Hgsigns*` groups.
-   Any colorscheme or `vim.api.nvim_set_hl` customisation you apply to
-   `GitSigns*` groups automatically applies to Mercurial signs too.  If
-   gitsigns is not installed you must define the required `GitSigns*` groups
-   yourself, or they will fall back to Neovim's built-in diff highlights
-   (`DiffAdd`, `DiffChange`, `DiffDelete`, …).
+1. **Highlight groups** — hgsigns defines its own `Hgsigns*` highlight groups
+   (for example `HgsignsAdd`, `HgsignsChange`, `HgsignsDelete`). To keep the
+   look consistent with gitsigns, these groups derive from the same Neovim
+   built-in diff highlights that gitsigns falls back to (`DiffAdd`,
+   `DiffChange`, `DiffDelete`, …), so a colorscheme that styles those built-ins
+   will style both plugins' signs identically. To customise Mercurial signs
+   specifically, set the `Hgsigns*` groups via `vim.api.nvim_set_hl`.
 
 2. **Keybindings** — the suggested keymaps use `<leader>g*` (matching
    gitsigns' conventions) rather than `<leader>h*`, so VCS operations share

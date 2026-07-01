@@ -8,11 +8,10 @@ local edit = helpers.edit
 local eq = helpers.eq
 local exec_lua = helpers.exec_lua
 local expectf = helpers.expectf
-local git = helpers.git
 local enable_lua_treesitter_on_filetype = helpers.enable_lua_treesitter_on_filetype
 local require_source_hls = helpers.require_source_hls
 local setup_hgsigns = helpers.setup_hgsigns
-local setup_test_repo = helpers.setup_test_repo
+local setup_test_repo = helpers.setup_test_hg_repo
 local test_config = helpers.test_config
 local test_file --- @type string
 
@@ -715,7 +714,7 @@ describe('popup preview', function()
     end)
 
     check({
-      status = { head = 'main', added = 0, changed = 1, removed = 0 },
+      status = { head = 'default', added = 0, changed = 1, removed = 0 },
       signs = { changed = 1 },
     })
 

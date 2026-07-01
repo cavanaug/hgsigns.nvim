@@ -14,7 +14,7 @@ local exec_lua = helpers.exec_lua
 local expectf = helpers.expectf
 local feed = helpers.feed
 local get_buf_var = api.nvim_buf_get_var
-local git = helpers.git
+local hg = helpers.hg
 local insert = helpers.insert
 local match_dag = helpers.match_dag
 local match_debug_messages = helpers.match_debug_messages
@@ -22,7 +22,7 @@ local match_lines = helpers.match_lines
 local n, p, np = helpers.n, helpers.p, helpers.np
 local path_pattern = helpers.path_pattern
 local setup_hgsigns = helpers.setup_hgsigns
-local setup_test_repo = helpers.setup_test_repo
+local setup_test_repo = helpers.setup_test_hg_repo
 local setup_test_hg_repo = helpers.setup_test_hg_repo
 local split = vim.split
 local test_config = helpers.test_config
@@ -41,10 +41,7 @@ local function refresh_paths()
   test_file = helpers.test_file
 end
 
-local revparse_pat = ('system.system: git .* rev-parse --show-toplevel --absolute-git-dir --abbrev-ref HEAD'):gsub(
-  '%-',
-  '%%-'
-)
+local revparse_pat = 'system.system: hg %-%-config ui%.relative%-paths=false root'
 local attach_open_pat = 'attach%.attach%(1%): Attaching %(trigger=Buf%u%l+%u%l+%)'
 
 describe('hgsigns (with screen)', function()
@@ -111,24 +108,21 @@ describe('hgsigns (with screen)', function()
 
     match_dag({
       'attach.attach(1): Attaching (trigger=BufReadPost)',
-      p('system.system: git .* config user.name'),
-      p(revparse_pat),
-      p(
-        'system.system: git .* ls%-files %-%-stage %-%-others %-%-exclude%-standard '
-          .. path_pattern(test_file)
-      ),
+      p('system.system: hg %-%-config ui%.relative%-paths=false root'),
+      p('system.system: hg %-%-config ui%.relative%-paths=false branch'),
       p('attach%.attach%(1%): Watching hg dir .*'),
     })
 
     check({
-      status = { head = '', added = 18, changed = 0, removed = 0 },
+      status = { head = 'default', added = 18, changed = 0, removed = 0 },
       signs = { untracked = nvim_ver == 9 and 8 or 7 },
     })
 
-    git('add', test_file)
+    hg('add', test_file)
+    hg('commit', '-m', 'init commit', '-u', 'tester')
 
     check({
-      status = { head = '', added = 0, changed = 0, removed = 0 },
+      status = { head = 'default', added = 0, changed = 0, removed = 0 },
       signs = {},
     })
   end)
@@ -215,20 +209,8 @@ describe('hgsigns (with screen)', function()
       end)
     end)
 
-    it('does not attach inside .git', function()
-      edit(scratch .. '/.git/index')
-
-      match_dag({
-        'attach.attach(1): Attaching (trigger=BufReadPost)',
-        p('system.system: hg %-%-config ui%.relative%-paths=false root'),
-        p(revparse_pat),
-        p('git%.new: Not in hg repo'),
-        p('attach%.attach%(1%): Empty hg obj'),
-      })
-    end)
-
     it("doesn't attach to ignored files", function()
-      write_to_file(scratch .. '/.gitignore', { 'dummy_ignored.txt' })
+      write_to_file(scratch .. '/.hgignore', { 'syntax: glob', 'dummy_ignored.txt' })
 
       local ignored_file = scratch .. '/dummy_ignored.txt'
 
@@ -237,163 +219,10 @@ describe('hgsigns (with screen)', function()
 
       match_debug_messages({
         'attach.attach(1): Attaching (trigger=BufReadPost)',
-        np(revparse_pat),
-        np('system.system: git .* config user.name'),
-        np('system.system: git .* ls%-files ' .. path_pattern(ignored_file)),
-        n('attach.attach(1): Cannot resolve file in repo'),
+        np('attach%.attach%(1%): Cannot resolve file in repo'),
       })
 
-      check({ status = { head = 'main' } })
-    end)
-
-    it('does not attach to nodiff files', function()
-      write_to_file(scratch .. '/.gitattributes', { '*.bar -diff' })
-
-      local nodiff_file = scratch .. '/dummy.bar'
-      write_to_file(nodiff_file, { 'dummy' })
-
-      git('add', scratch .. '/.gitattributes', nodiff_file)
-      git('commit', '-m', 'add nodiff file')
-
-      edit(nodiff_file)
-
-      match_debug_messages({
-        'attach.attach(1): Attaching (trigger=BufReadPost)',
-        np(revparse_pat),
-        np('attach%.attach%(1%): File has %-diff attribute'),
-      })
-
-      check({ status = { head = 'main' }, signs = {} })
-    end)
-
-    it('requires --force to manually attach to nodiff files from the command line', function()
-      write_to_file(scratch .. '/.gitattributes', { '*.bar -diff' })
-
-      local nodiff_file = scratch .. '/dummy.bar'
-      write_to_file(nodiff_file, { 'dummy' })
-
-      git('add', scratch .. '/.gitattributes', nodiff_file)
-      git('commit', '-m', 'add nodiff file')
-
-      edit(nodiff_file)
-
-      match_debug_messages({
-        'attach.attach(1): Attaching (trigger=BufReadPost)',
-        np(revparse_pat),
-        np('attach%.attach%(1%): File has %-diff attribute'),
-      })
-
-      command('Hgsigns attach')
-
-      match_debug_messages({
-        'attach.attach(1): Attaching (trigger=BufReadPost)',
-        np(revparse_pat),
-        np('attach%.attach%(1%): File has %-diff attribute'),
-        'attach.attach(1): Attaching (trigger=command)',
-        np(revparse_pat),
-        np('attach%.attach%(1%): File has %-diff attribute'),
-      })
-
-      check({ status = { head = 'main' }, signs = {} })
-
-      command('Hgsigns attach --force')
-
-      wait_for_attach()
-      check({ status = { head = 'main', added = 0, changed = 0, removed = 0 }, signs = {} })
-    end)
-
-    it('can manually attach to nodiff files via attach({ force = true })', function()
-      write_to_file(scratch .. '/.gitattributes', { '*.bar -diff' })
-
-      local nodiff_file = scratch .. '/dummy.bar'
-      write_to_file(nodiff_file, { 'dummy' })
-
-      git('add', scratch .. '/.gitattributes', nodiff_file)
-      git('commit', '-m', 'add nodiff file')
-
-      edit(nodiff_file)
-
-      match_debug_messages({
-        'attach.attach(1): Attaching (trigger=BufReadPost)',
-        np(revparse_pat),
-        np('attach%.attach%(1%): File has %-diff attribute'),
-      })
-
-      exec_lua([[require('hgsigns').attach({ force = true })]])
-
-      wait_for_attach()
-      check({ status = { head = 'main', added = 0, changed = 0, removed = 0 }, signs = {} })
-    end)
-
-    it('can manually attach to nodiff files with force and a custom trigger', function()
-      write_to_file(scratch .. '/.gitattributes', { '*.bar -diff' })
-
-      local nodiff_file = scratch .. '/dummy.bar'
-      write_to_file(nodiff_file, { 'dummy' })
-
-      git('add', scratch .. '/.gitattributes', nodiff_file)
-      git('commit', '-m', 'add nodiff file')
-
-      edit(nodiff_file)
-
-      match_debug_messages({
-        'attach.attach(1): Attaching (trigger=BufReadPost)',
-        np(revparse_pat),
-        np('attach%.attach%(1%): File has %-diff attribute'),
-      })
-
-      exec_lua([=[
-        require('hgsigns').attach({
-          bufnr = vim.api.nvim_get_current_buf(),
-          trigger = 'test',
-          force = true,
-        })
-      ]=])
-
-      wait_for_attach()
-      check({ status = { head = 'main', added = 0, changed = 0, removed = 0 }, signs = {} })
-    end)
-
-    it('can manually attach to nodiff files with an explicit bufnr in opts', function()
-      write_to_file(scratch .. '/.gitattributes', { '*.bar -diff' })
-
-      local nodiff_file = scratch .. '/dummy.bar'
-      write_to_file(nodiff_file, { 'dummy' })
-
-      git('add', scratch .. '/.gitattributes', nodiff_file)
-      git('commit', '-m', 'add nodiff file')
-
-      edit(nodiff_file)
-
-      match_debug_messages({
-        'attach.attach(1): Attaching (trigger=BufReadPost)',
-        np(revparse_pat),
-        np('attach%.attach%(1%): File has %-diff attribute'),
-      })
-
-      exec_lua(
-        [[require('hgsigns').attach({ bufnr = vim.api.nvim_get_current_buf(), force = true })]]
-      )
-
-      wait_for_attach()
-      check({ status = { head = 'main', added = 0, changed = 0, removed = 0 }, signs = {} })
-    end)
-
-    it("doesn't attach to non-existent files", function()
-      edit(newfile)
-
-      match_debug_messages({
-        'attach.attach(1): Attaching (trigger=BufNewFile)',
-        np(revparse_pat),
-        np('system.system: git .* config user.name'),
-        np(
-          'system.system: git .* ls%-files %-%-stage %-%-others %-%-exclude%-standard '
-            .. path_pattern(newfile)
-        ),
-        'attach.attach(1): Cannot resolve file in repo',
-      })
-
-      check({ status = { head = 'main' } })
+      check({ status = { head = 'default' } })
     end)
 
     it("doesn't attach to non-existent files with non-existent sub-dirs", function()
@@ -463,11 +292,10 @@ describe('hgsigns (with screen)', function()
       restore_notify_once()
     end)
 
-    local function blame_line_ui_test(autocrlf, file_ending)
+    local function blame_line_ui_test(file_ending)
       setup_test_repo()
       exec_lua([[vim.g.editorconfig = false]])
 
-      git('config', 'core.autocrlf', autocrlf)
       if file_ending == 'dos' then
         write_to_file(newfile, { 'This', 'is', 'a', 'windows', 'file' }, {
           newline = '\r\n',
@@ -476,8 +304,8 @@ describe('hgsigns (with screen)', function()
         write_to_file(newfile, { 'This', 'is', 'a', 'windows', 'file' })
       end
 
-      git('add', newfile)
-      git('commit', '-m', 'commit on main')
+      hg('add', newfile)
+      hg('commit', '-m', 'commit on main', '-u', 'tester')
 
       edit(newfile)
       feed('gg')
@@ -507,13 +335,13 @@ describe('hgsigns (with screen)', function()
     end
 
     it('does handle dos fileformats', function()
-      -- Add a file with windows line ending into the repo
-      -- Disable autocrlf, so that the file keeps the \r\n file endings.
-      blame_line_ui_test('false', 'dos')
+      -- Add a file with windows line endings into the repo.
+      -- hg stores files verbatim, so the \r\n line endings are preserved.
+      blame_line_ui_test('dos')
     end)
 
     it('does handle unix', function()
-      blame_line_ui_test('false', 'unix')
+      blame_line_ui_test('unix')
     end)
 
     it('falls back when function formatters return invalid virt_text', function()
@@ -745,12 +573,7 @@ describe('hgsigns (with screen)', function()
       edit(test_file)
       match_debug_messages({
         'attach.attach(1): Attaching (trigger=BufReadPost)',
-        np(revparse_pat),
-        np('system.system: git .* rev%-parse %-%-short HEAD'),
-        np('system.system: git .* config user.name'),
-        np('system.system: git .* %-%-git%-dir .* %-%-stage %-%-others %-%-exclude%-standard .*'),
-        np('system.system: git .* check%-attr diff %-%-stdin'),
-        n('attach.attach(1): User on_attach() returned false'),
+        np('attach%.attach%(1%): User on_attach%(%) returned false'),
       })
     end)
   end)
@@ -763,21 +586,21 @@ describe('hgsigns (with screen)', function()
       feed('oEDIT<esc>')
       command('write')
 
-      git('add', test_file)
-      git('commit', '-m', 'commit on main')
+      hg('add', test_file)
+      hg('commit', '-m', 'commit on main', '-u', 'tester')
 
       -- Don't setup hgsigns until the repo has two commits
       setup_hgsigns(config)
 
       check({
-        status = { head = 'main', added = 0, changed = 0, removed = 0 },
+        status = { head = 'default', added = 0, changed = 0, removed = 0 },
         signs = {},
       })
 
       command('Hgsigns change_base ~')
 
       check({
-        status = { head = 'main', added = 1, changed = 0, removed = 0 },
+        status = { head = 'default', added = 1, changed = 0, removed = 0 },
         signs = { added = 1 },
       })
     end)
@@ -808,7 +631,7 @@ describe('hgsigns (with screen)', function()
         feed('ddx') -- Change delete
 
         check({
-          status = { head = 'main', added = 1, changed = 2, removed = 3 },
+          status = { head = 'default', added = 1, changed = 2, removed = 3 },
           signs = { topdelete = 1, changedelete = 1, added = 1, delete = 1, changed = 1 },
         })
       end)
@@ -857,43 +680,11 @@ describe('hgsigns (with screen)', function()
       it('attaches to newly created files', function()
         setup_hgsigns(config)
         edit(newfile)
-        local messages = {
-          'attach.attach(1): Attaching (trigger=BufNewFile)',
-          np(revparse_pat),
-          np('system.system: git .* config user.name'),
-          np('system.system: git .* ls%-files .*'),
-          n('attach.attach(1): Cannot resolve file in repo'),
-        }
-
-        if fn.has('win32') == 1 then
-          table.insert(
-            messages,
-            5,
-            p(vim.pesc('system.system: cygpath --absolute --unix ') .. path_pattern(newfile))
-          )
-        end
-
-        match_debug_messages(messages)
         command('write')
-
-        local messages = {
-          'attach.attach(1): Attaching (trigger=BufWritePost)',
-          np(revparse_pat),
-          np('system.system: git .* ls%-files .*'),
-          np('attach%.attach%(1%): Watching hg dir .*'),
-        }
-
-        if not internal_diff then
-          table.insert(
-            messages,
-            np(vim.pesc('system.system: git ') .. '.* diff .* .*[\\/].* .*[\\/].*')
-          )
-        end
-
-        match_debug_messages(messages)
+        wait_for_attach()
 
         check({
-          status = { head = 'main', added = 1, changed = 0, removed = 0 },
+          status = { head = 'default', added = 1, changed = 0, removed = 0 },
           signs = { untracked = 1 },
         })
       end)
@@ -907,42 +698,14 @@ describe('hgsigns (with screen)', function()
         command('write')
 
         check({
-          status = { head = 'main' },
+          status = { head = 'default' },
           signs = {},
         })
 
         command('Hgsigns attach --force')
 
         check({
-          status = { head = 'main', added = 1, changed = 0, removed = 0 },
-          signs = { untracked = 1 },
-        })
-      end)
-
-      it('tracks files in new repos', function()
-        setup_hgsigns(config)
-        helpers.touch(newfile)
-        edit(newfile)
-
-        feed('iEDIT<esc>')
-        command('write')
-
-        check({
-          status = { head = 'main', added = 1, changed = 0, removed = 0 },
-          signs = { untracked = 1 },
-        })
-
-        git('add', newfile)
-
-        check({
-          status = { head = 'main', added = 0, changed = 0, removed = 0 },
-          signs = {},
-        })
-
-        git('reset')
-
-        check({
-          status = { head = 'main', added = 1, changed = 0, removed = 0 },
+          status = { head = 'default', added = 1, changed = 0, removed = 0 },
           signs = { untracked = 1 },
         })
       end)
@@ -963,7 +726,7 @@ describe('hgsigns (with screen)', function()
         feed('ddx') -- Change delete
 
         check({
-          status = { head = 'main', added = 1, changed = 2, removed = 3 },
+          status = { head = 'default', added = 1, changed = 2, removed = 3 },
           signs = { topdelete = 1, added = 1, changed = 1, delete = 1, changedelete = 1 },
         })
 
@@ -983,15 +746,16 @@ describe('hgsigns (with screen)', function()
         edit(spacefile)
 
         check({
-          status = { head = 'main', added = 3, removed = 0, changed = 0 },
+          status = { head = 'default', added = 3, removed = 0, changed = 0 },
           signs = { untracked = 3 },
         })
 
-        git('add', spacefile)
+        hg('add', spacefile)
+        hg('commit', '-m', 'add spaced file', '-u', 'tester')
         edit(spacefile)
 
         check({
-          status = { head = 'main', added = 0, removed = 0, changed = 0 },
+          status = { head = 'default', added = 0, removed = 0, changed = 0 },
           signs = {},
         })
       end)
@@ -1215,21 +979,6 @@ describe('hgsigns (with screen)', function()
     })
   end)
 
-  it('show short SHA when detached head', function()
-    setup_test_repo()
-    git('checkout', '--detach')
-
-    -- Disable debug_mode so the sha is calculated
-    config.debug_mode = false
-    setup_hgsigns(config)
-    edit(test_file)
-
-    -- SHA is not deterministic so just check it can be cast as a hex value
-    expectf(function()
-      helpers.neq(nil, tonumber('0x' .. get_buf_var(0, 'hgsigns_head')))
-    end)
-  end)
-
   it('handles a quick undo', function()
     setup_test_repo()
     setup_hgsigns(config)
@@ -1255,7 +1004,7 @@ describe('hgsigns (with screen)', function()
     wait_for_attach()
     feed('x')
     check({
-      status = { head = 'main', added = 0, changed = 1, removed = 0 },
+      status = { head = 'default', added = 0, changed = 1, removed = 0 },
       signs = { changed = 1 },
     })
 
@@ -1270,8 +1019,8 @@ describe('hgsigns (with screen)', function()
 
     write_to_file(uni_filename, { 'Lorem ipsum' })
 
-    git('add', uni_filename)
-    git('commit', '-m', 'another commit')
+    hg('add', uni_filename)
+    hg('commit', '-m', 'another commit', '-u', 'tester')
 
     edit(uni_filename)
 
@@ -1409,15 +1158,14 @@ describe('hgsigns attach', function()
     local path2 = subdir .. '/cargo.toml'
 
     write_to_file(path1, { 'some text' })
-    git('add', path1)
-    git('commit', '-m', 'add cargo')
+    hg('add', path1)
+    hg('commit', '-m', 'add cargo', '-u', 'tester')
 
-    -- move file and stage move
+    -- move file and record the move
     helpers.mkdir(subdir)
-    helpers.move(path1, path2)
-    git('add', path1, path2)
+    hg('mv', path1, path2)
 
-    config.base = 'HEAD'
+    config.base = '.'
     setup_hgsigns(config)
     edit(path1)
     wait_for_attach()
@@ -1431,30 +1179,15 @@ describe('hgsigns attach', function()
     end)
   end)
 
-  it('does not error on non-file fugitive buffers (#1277)', function()
-    -- Note this test is testing the attach logic before the git_obj
-    -- is created.
-
-    setup_hgsigns(config)
-
-    -- Since this bufname isn't a valid path, Nvim will not trigger the
-    -- BufNewFile autocmd, therefore we need to manually attach.
-    edit(('fugitive://%s/.git//'):format(scratch))
-    command('Hgsigns attach')
-    match_debug_messages({
-      'attach.attach(1): Empty hg obj',
-    })
-  end)
-
   it('attaches to a tracked file in a subdirectory', function()
-    helpers.git_init_scratch()
+    helpers.hg_init_scratch()
 
     local relpath = 'sub/test.txt'
     local file = scratch .. '/' .. relpath
 
     write_to_file(file, { 'hello', 'world' })
-    git('add', file)
-    git('commit', '-m', 'add nested file')
+    hg('add', file)
+    hg('commit', '-m', 'add nested file', '-u', 'tester')
 
     setup_hgsigns(config)
     edit(file)
@@ -1474,46 +1207,12 @@ describe('hgsigns attach', function()
     eq_path(scratch, result.toplevel)
   end)
 
-  it('attaches with a relative file path in the git context', function()
-    helpers.git_init_scratch()
-
-    local relpath = 'sub/relative.txt'
-    local file = scratch .. '/' .. relpath
-
-    write_to_file(file, { 'hello', 'world' })
-    git('add', file)
-    git('commit', '-m', 'add relative file')
-
-    config.auto_attach = false
-    setup_hgsigns(config)
-    edit(file)
-
-    attach_with_context(api.nvim_get_current_buf(), {
-      file = relpath,
-      gitdir = scratch .. '/.git',
-      toplevel = scratch,
-    })
-
-    local result = exec_lua(function(bufnr)
-      local cache = assert(require('hgsigns.cache').cache[bufnr])
-      return {
-        relpath = cache.git_obj.relpath,
-        object_name = cache.git_obj.object_name or '',
-        file = cache.git_obj.file,
-      }
-    end, api.nvim_get_current_buf())
-
-    eq(relpath, result.relpath)
-    eq(false, result.object_name == '')
-    eq_path(file, result.file)
-  end)
-
   it('can run diffthis/show when cwd is a subdir of a hg repo (#1277)', function()
-    helpers.git_init_scratch()
+    helpers.hg_init_scratch()
     local file = scratch .. '/sub/test'
     write_to_file(file, { 'hello' })
-    git('add', file)
-    git('commit', '-m', 'commit 1')
+    hg('add', file)
+    hg('commit', '-m', 'commit 1', '-u', 'tester')
     command('cd ' .. vim.fs.dirname(file))
 
     setup_hgsigns(config)
@@ -1545,11 +1244,11 @@ describe('hgsigns attach', function()
 
     eq_path(file, gfile)
     eq_path(scratch, toplevel)
-    eq_path(scratch .. '/.git', gitdir)
-    eq('main', abbrev_head)
+    eq_path(scratch .. '/.hg', gitdir)
+    eq('default', abbrev_head)
   end)
 
-  it('does not error after git system callbacks (#1425)', function()
+  it('does not error after hg system callbacks (#1425)', function()
     setup_test_repo()
     setup_hgsigns(config)
 
@@ -1558,14 +1257,14 @@ describe('hgsigns attach', function()
 
     local ok = exec_lua(function()
       local async = require('hgsigns.async')
-      local git_cmd = require('hgsigns.git.cmd')
+      local hg_cmd = require('hgsigns.git.cmd')
 
       return async
         .run(function()
-          -- `git_cmd()` ultimately uses `vim.system`, whose on_exit callback runs
+          -- `hg_cmd()` ultimately uses `vim.system`, whose on_exit callback runs
           -- in fast event context. Ensure we yield to the scheduler after the
           -- command completes so Neovim API calls here don't raise E5560.
-          git_cmd({ '--version' }, { text = true })
+          hg_cmd({ '--version' }, { text = true })
 
           local b = vim.api.nvim_create_buf(false, true)
           vim.bo[b].buftype = 'nofile'
@@ -1576,23 +1275,5 @@ describe('hgsigns attach', function()
     end)
 
     eq(true, ok)
-  end)
-
-  it('does not error when attaching to files out of tree (#1297)', function()
-    setup_test_repo()
-    setup_hgsigns(config)
-
-    exec_lua(function(scratch0)
-      vim.env.GIT_DIR = scratch0 .. '/.git'
-      vim.env.GIT_WORK_TREE = scratch0
-    end, scratch)
-
-    edit(fn.tempname())
-
-    match_dag({
-      p('system.system: hg %-%-config ui%.relative%-paths=false root'),
-      p("get_info_git: '.*' is outside worktree '.*'"),
-      p('attach%.attach%(1%): Empty hg obj'),
-    })
   end)
 end)

@@ -6,17 +6,6 @@ local config = require('hgsigns.config').config
 
 local api = vim.api
 
-local SHOW_FORMAT = table.concat({
-  'commit' .. '%x20%H',
-  'tree' .. '%x20%T',
-  'parent' .. '%x20%P',
-  'author' .. '%x20%an%x20<%ae>%x20%ad',
-  'committer' .. '%x20%cn%x20<%ce>%x20%cd',
-  'encoding' .. '%x20%e',
-  '',
-  '%B',
-}, '%n')
-
 --- @param line string
 --- @return string
 local function strip_ansi(line)
@@ -95,23 +84,7 @@ end
 --- @param base string
 --- @return string[]
 local function build_show_output(repo, base)
-  if repo.vcs == 'hg' then
-    return build_hg_show_output(repo, base)
-  end
-
-  local res = repo:command({
-    'show',
-    '--unified=0',
-    '--format=format:' .. SHOW_FORMAT,
-    base,
-  })
-
-  -- Remove encoding line if it's not set to something meaningful
-  if assert(res[6]):match('^encoding (unknown)?') == nil then
-    table.remove(res, 6)
-  end
-
-  return sanitize_lines(res)
+  return build_hg_show_output(repo, base)
 end
 
 --- @param lnum integer
@@ -218,7 +191,7 @@ function M.show_commit(base, open, bufnr, ref_list, ref_list_ptr)
   end
 
   local repo = bcache.git_obj.repo
-  base = Util.norm_base(base or Util.default_revision(repo.vcs), repo.vcs)
+  base = Util.norm_base(base or Util.default_revision())
   local res = build_show_output(repo, assert(base))
 
   local buffer_name = bcache:get_rev_bufname(base, false)

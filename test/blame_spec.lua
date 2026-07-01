@@ -9,11 +9,10 @@ local exec_lua = helpers.exec_lua
 local expectf = helpers.expectf
 local feed = helpers.feed
 local fn = helpers.fn
-local git = helpers.git
 local hg = helpers.hg
 local require_source_hls = helpers.require_source_hls
 local setup_hgsigns = helpers.setup_hgsigns
-local setup_test_repo = helpers.setup_test_repo
+local setup_test_repo = helpers.setup_test_hg_repo
 local setup_test_hg_repo = helpers.setup_test_hg_repo
 local test_config = helpers.test_config
 local wait_for_attach = helpers.wait_for_attach
@@ -113,12 +112,12 @@ describe('blame', function()
       test_file_text = { 'one', 'two', 'three', 'four', 'five' },
     })
     helpers.write_to_file(test_file, { 'ONE', 'two', 'three', 'four', 'five' })
-    helpers.git('add', test_file)
-    helpers.git('commit', '-m', 'second commit')
+    helpers.hg('add', test_file)
+    helpers.hg('commit', '-m', 'second commit', '-u', 'tester')
 
     edit(test_file)
     check({
-      status = { head = 'main', added = 0, changed = 0, removed = 0 },
+      status = { head = 'default', added = 0, changed = 0, removed = 0 },
       signs = {},
     })
     open_blame_window()
@@ -146,7 +145,7 @@ describe('blame', function()
 
     edit(test_file)
     check({
-      status = { head = 'main', added = 0, changed = 0, removed = 0 },
+      status = { head = 'default', added = 0, changed = 0, removed = 0 },
       signs = {},
     })
 
@@ -155,7 +154,7 @@ describe('blame', function()
     local result = get_blame_panel_state()
     local date_pat = result.date:gsub('%-', '%%-')
 
-    assert(result.lines[1]:match('^┍ %x%x%x%x%x%x%x%x tester ' .. date_pat .. '$'))
+    assert(result.lines[1]:match('^┍ %x+ tester ' .. date_pat .. '$'))
     eq('┕ init commit', result.lines[2])
     eq(true, has_hl_match(result.row_hls, 1, '^HgsignsBlameColor%.'))
     eq(true, has_hl(result.row_hls, 2, 'Comment'))
@@ -171,7 +170,7 @@ describe('blame', function()
 
     edit(test_file)
     check({
-      status = { head = 'main', added = 0, changed = 0, removed = 0 },
+      status = { head = 'default', added = 0, changed = 0, removed = 0 },
       signs = {},
     })
 
@@ -179,7 +178,7 @@ describe('blame', function()
 
     local result = get_blame_panel_state()
 
-    assert(result.lines[1]:match('^┍ ' .. result.year .. ' %x%x%x%x%x%x%x%x init commit$'))
+    assert(result.lines[1]:match('^┍ ' .. result.year .. ' %x+ init commit$'))
     eq('┕', result.lines[2])
     eq(true, has_hl_match(result.row_hls, 1, '^HgsignsBlameColor%.'))
     eq(false, has_hl(result.row_hls, 2, 'Comment'))
@@ -197,12 +196,12 @@ describe('blame', function()
     }, ' ')
 
     helpers.write_to_file(test_file, { 'ONE', 'TWO' })
-    helpers.git('add', test_file)
-    helpers.git('commit', '-m', summary)
+    helpers.hg('add', test_file)
+    helpers.hg('commit', '-m', summary, '-u', 'tester')
 
     edit(test_file)
     check({
-      status = { head = 'main', added = 0, changed = 0, removed = 0 },
+      status = { head = 'default', added = 0, changed = 0, removed = 0 },
       signs = {},
     })
 
@@ -235,7 +234,7 @@ describe('blame', function()
 
     edit(test_file)
     check({
-      status = { head = 'main', added = 0, changed = 0, removed = 0 },
+      status = { head = 'default', added = 0, changed = 0, removed = 0 },
       signs = {},
     })
 
@@ -243,7 +242,7 @@ describe('blame', function()
 
     local result = get_blame_panel_state()
 
-    assert(result.lines[1]:match('^┍ %x%x%x%x%x%x%x%x tester ' .. result.year .. '$'))
+    assert(result.lines[1]:match('^┍ %x+ tester ' .. result.year .. '$'))
     eq('┕', result.lines[2])
     eq(true, has_hl_match(result.row_hls, 1, '^HgsignsBlameColor%.'))
     eq(true, has_hl(result.row_hls, 1, 'ErrorMsg'))
@@ -265,7 +264,7 @@ describe('blame', function()
 
     edit(test_file)
     check({
-      status = { head = 'main', added = 0, changed = 0, removed = 0 },
+      status = { head = 'default', added = 0, changed = 0, removed = 0 },
       signs = {},
     })
 
@@ -274,55 +273,10 @@ describe('blame', function()
     local result = get_blame_panel_state()
     local date_pat = result.date:gsub('%-', '%%-')
 
-    assert(result.lines[1]:match('^┍ %x%x%x%x%x%x%x%x tester ' .. date_pat .. '$'))
+    assert(result.lines[1]:match('^┍ %x+ tester ' .. date_pat .. '$'))
     eq('┕ init commit', result.lines[2])
     eq(true, has_hl_match(result.row_hls, 1, '^HgsignsBlameColor%.'))
     eq(true, has_hl(result.row_hls, 2, 'Comment'))
-  end)
-
-  it('uses a repo-relative path when running blame', function()
-    local args = exec_lua(function()
-      local blame = require('hgsigns.git.blame')
-
-      local captured_args
-      local obj = {
-        file = 'C:/msys64/home/User/.dotfiles/.config/nvim/lua/mappings.lua',
-        relpath = '.config/nvim/lua/mappings.lua',
-        object_name = ('a'):rep(40),
-        repo = {
-          abbrev_head = 'main',
-          toplevel = 'C:/msys64/home/User/.dotfiles',
-          command = function(_, argv, spec)
-            captured_args = vim.deepcopy(argv)
-            spec.stdout(
-              nil,
-              table.concat({
-                ('a'):rep(40) .. ' 1 1 1',
-                'author tester',
-                'author-mail <tester@example.com>',
-                'author-time 0',
-                'author-tz +0000',
-                'committer tester',
-                'committer-mail <tester@example.com>',
-                'committer-time 0',
-                'committer-tz +0000',
-                'summary init',
-                'filename .config/nvim/lua/mappings.lua',
-                '',
-              }, '\n')
-            )
-            return {}, nil, 0
-          end,
-        },
-      }
-
-      blame.run_blame(obj, { 'line' }, 1, nil, {})
-
-      return captured_args
-    end)
-
-    eq('--', args[#args - 1])
-    eq('.config/nvim/lua/mappings.lua', args[#args])
   end)
 
   it('parses mercurial annotate output with repo-relative nested paths', function()
@@ -582,15 +536,15 @@ describe('blame', function()
   end)
 
   it('blames a tracked file in a nested path', function()
-    helpers.git_init_scratch()
+    helpers.hg_init_scratch()
     setup_hgsigns(test_config)
 
     local relpath = '.config/nvim/lua/mappings.lua'
     local file = scratch .. '/' .. relpath
 
     write_to_file(file, { 'hello', 'world' })
-    git('add', file)
-    git('commit', '-m', 'add nested mappings')
+    hg('add', file)
+    hg('commit', '-m', 'add nested mappings', '-u', 'tester')
 
     edit(file)
 

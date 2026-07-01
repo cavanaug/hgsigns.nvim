@@ -65,9 +65,8 @@ end
 
 --- @param filename string?
 --- @param events { change:boolean?, rename:boolean? }?
---- @param vcs 'git'|'hg'
 --- @return boolean notify
-local function should_notify_fs_event(filename, events, vcs)
+local function should_notify_fs_event(filename, events)
   -- The luv docs say filename is passed as a string but it has been observed
   -- to sometimes be nil.
   --    https://github.com/lewis6991/gitsigns.nvim/issues/848
@@ -77,12 +76,8 @@ local function should_notify_fs_event(filename, events, vcs)
   end
 
   local details = vim.inspect(events, { indent = '', newline = ' ' })
-  if vim.startswith(filename, '.watchman-cookie') or vim.startswith(filename, 'index.lock') then
-    log.dprintf("Git dir update: '%s' %s (ignoring)", filename, details)
-    return false
-  end
-
-  if vcs == 'hg' and filename ~= 'dirstate' and filename ~= 'branch' then
+  if filename ~= 'dirstate' and filename ~= 'branch' then
+    log.dprintf("Hg dir update: '%s' %s (ignoring)", filename, details)
     return false
   end
 
@@ -111,9 +106,7 @@ end
 --- @field private notify_debounced fun()
 --- @field private gitdir string
 --- @field private commondir string
---- @field private vcs 'git'|'hg'
 --- @field private handles table<string, uv.uv_fs_event_t|uv.uv_fs_poll_t> Map from concrete handle path -> handle
---- @field private head_ref? string
 --- @field private _backend 'fs_event'|'fs_poll'
 --- @field private _target_fingerprints table<string, string?> Snapshot of fs_poll logical targets
 --- @field private _closed? true
@@ -123,15 +116,13 @@ Watcher.__index = Watcher
 
 --- @param gitdir string
 --- @param commondir? string
---- @param vcs? 'git'|'hg'
 --- @return Hgsigns.Repo.Watcher
-function Watcher.new(gitdir, commondir, vcs)
+function Watcher.new(gitdir, commondir)
   local self = setmetatable({}, Watcher)
 
   self.update_callbacks = {}
   self.gitdir = gitdir
   self.commondir = commondir or gitdir
-  self.vcs = vcs or 'git'
   self.handles = {}
   self._backend = FS_EVENT
   self._target_fingerprints = {}
@@ -239,7 +230,6 @@ function Watcher:_start_handle_path(handle_path)
 
   self.handles[handle_path] = handle
 
-  local vcs = self.vcs
   local weak_self = util.weak_ref(self)
   local callback = function(err0, arg1, arg2)
     local watcher = weak_self.ref
@@ -268,7 +258,7 @@ function Watcher:_start_handle_path(handle_path)
 
     local should_notify
     if is_fs_event then
-      should_notify = should_notify_fs_event(arg1, arg2, vcs)
+      should_notify = should_notify_fs_event(arg1, arg2)
     else
       should_notify = should_notify_fs_poll(handle_path, watcher._target_fingerprints)
       -- A poll callback may mean the target appeared or disappeared, so the
@@ -348,71 +338,19 @@ end
 --- @private
 --- @return string[]
 function Watcher:_fs_event_targets()
-  if self.vcs == 'hg' then
-    -- For hg, watch the .hg/ directory directly.
-    return { self.gitdir }
-  end
-
-  local targets = {
-    self.gitdir,
-    Path.join(self.commondir, 'reftable'),
-  }
-
-  if self.commondir ~= self.gitdir then
-    targets[#targets + 1] = self.commondir
-  end
-
-  if self.head_ref then
-    local rel_dir = vim.fs.dirname(self.head_ref)
-    if rel_dir and rel_dir ~= '.' then
-      targets[#targets + 1] = Path.join(self.commondir, rel_dir)
-    end
-  end
-
-  return targets
+  -- Watch the .hg/ directory directly.
+  return { self.gitdir }
 end
 
 --- @private
 --- @return string[]
 function Watcher:_fs_poll_targets()
-  if self.vcs == 'hg' then
-    -- Poll the key hg metadata files that change on commit/branch/bookmark ops.
-    return {
-      Path.join(self.gitdir, 'dirstate'),
-      Path.join(self.gitdir, 'branch'),
-      Path.join(self.gitdir, 'bookmarks'),
-    }
-  end
-
-  local targets = {
-    Path.join(self.gitdir, 'HEAD'),
-    Path.join(self.gitdir, 'index'),
-    Path.join(self.commondir, 'packed-refs'),
-    Path.join(self.commondir, 'reftable'),
+  -- Poll the key hg metadata files that change on commit/branch/bookmark ops.
+  return {
+    Path.join(self.gitdir, 'dirstate'),
+    Path.join(self.gitdir, 'branch'),
+    Path.join(self.gitdir, 'bookmarks'),
   }
-
-  if self.head_ref then
-    targets[#targets + 1] = Path.join(self.commondir, self.head_ref)
-  end
-
-  return targets
-end
-
---- Watch the directory containing `head_ref` under commondir (git only).
---- This ensures we see branch-tip moves which update the target ref file but
---- don't necessarily touch `gitdir/HEAD`.
---- @param head_ref? string
-function Watcher:set_head_ref(head_ref)
-  if self.vcs ~= 'git' then
-    return
-  end
-
-  if self.head_ref == head_ref then
-    return
-  end
-
-  self.head_ref = head_ref
-  self:_sync_watches()
 end
 
 --- @param callback fun() Callback function to be invoked on update.
