@@ -102,7 +102,6 @@ local validate = require('hgsigns.util').validate
 --- -- Undocumented
 --- @field _refresh_staged_on_update boolean
 --- @field _threaded_diff boolean
---- @field gh boolean
 --- @field _verbose boolean
 --- @field _test_mode boolean
 --- @field _allow_fs_poll_fallback boolean
@@ -730,15 +729,6 @@ M.schema = {
     description = [[
       When using setqflist() or setloclist(), open Trouble instead of the
       quickfix/location list window.
-    ]],
-  },
-
-  gh = {
-    type = 'boolean',
-    default = false,
-    description = [[
-      Enable GitHub integration. This allows the following features:
-      • `:Hgsigns blame_line` will show PR numbers (with a hyperlink)
     ]],
   },
 

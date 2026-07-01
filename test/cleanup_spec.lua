@@ -116,61 +116,6 @@ describe('cleanup', function()
     assert(messages:find('stage_buffer is not a valid function or action', 1, true), messages)
   end)
 
-  it('renders mercurial blame without requiring hgsigns.gh', function()
-    local config = vim.deepcopy(test_config)
-    config.gh = true
-
-    setup_test_hg_repo()
-    setup_hgsigns(config)
-    edit(test_file)
-
-    expectf(function()
-      return exec_lua(function()
-        return vim.b.hgsigns_status_dict.gitdir ~= nil
-      end)
-    end)
-
-    exec_lua(function()
-      package.loaded['hgsigns.gh'] = nil
-      package.preload['hgsigns.gh'] = function()
-        error('cleanup_spec: hgsigns.gh should not be required')
-      end
-
-      local async = require('hgsigns.async')
-      async.run(require('hgsigns.actions.blame_line'), { full = true }):raise_on_error()
-    end)
-
-    eq(
-      true,
-      exec_lua(function()
-        return vim.wait(5000, function()
-          return require('hgsigns.popup').is_open('blame') ~= nil
-        end)
-      end)
-    )
-
-    local popup_text = table.concat(
-      exec_lua(function()
-        local popup = require('hgsigns.popup')
-        local winid = assert(popup.is_open('blame'))
-        local bufnr = vim.api.nvim_win_get_buf(winid)
-        return vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-      end),
-      '\n'
-    )
-
-    assert(
-      popup_text:find('tester', 1, true) ~= nil
-        or popup_text:find('Not Committed Yet', 1, true) ~= nil,
-      popup_text
-    )
-    assert(
-      popup_text:find('Hunk 1 of 1', 1, true) ~= nil
-        or popup_text:find('File added in commit', 1, true) ~= nil,
-      popup_text
-    )
-  end)
-
   it('does not expose staged-only fields in cache debug dumps', function()
     setup_test_hg_repo()
     setup_hgsigns(test_config)

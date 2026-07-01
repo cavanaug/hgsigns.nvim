@@ -595,9 +595,7 @@ describe('blame', function()
     helpers.hg('add', test_file)
     helpers.hg('commit', '-m', 'rename foo', '-u', 'tester')
 
-    local config = vim.deepcopy(test_config)
-    config.gh = true
-    setup_hgsigns(config)
+    setup_hgsigns(test_config)
     edit(test_file)
     enable_lua_treesitter_on_filetype('hgsigns_blame_treesitter')
 
@@ -605,17 +603,6 @@ describe('blame', function()
       status = { head = 'default', added = 0, changed = 0, removed = 0 },
       signs = {},
     })
-
-    exec_lua(function()
-      package.loaded['hgsigns.gh'] = {
-        commit_url = function()
-          return 'https://example.test/commit'
-        end,
-        create_pr_linespec = function()
-          return { { '#1 ', 'Title', 'https://example.test/pr/1' } }
-        end,
-      }
-    end)
 
     open_full_blame_popup()
 
@@ -718,7 +705,7 @@ describe('blame', function()
       eq(result.expected_deleted_diff, result.actual_deleted_diff)
       eq(result.expected_added_keyword, result.actual_added_keyword)
       eq(result.expected_added_diff, result.actual_added_diff)
-      assert(result.title:find('#1', 1, true))
+      assert(result.title:find('tester', 1, true))
     end)
   end)
 
@@ -735,25 +722,12 @@ describe('blame', function()
     helpers.hg('add', test_file)
     helpers.hg('commit', '-m', 'rename foo', '-u', 'tester')
 
-    local config = vim.deepcopy(test_config)
-    config.gh = true
-    setup_hgsigns(config)
+    setup_hgsigns(test_config)
     edit(test_file)
     check({
       status = { head = 'default', added = 0, changed = 0, removed = 0 },
       signs = {},
     })
-
-    exec_lua(function()
-      package.loaded['hgsigns.gh'] = {
-        commit_url = function()
-          return 'https://example.test/commit'
-        end,
-        create_pr_linespec = function()
-          return { { '#1 ', 'Title', 'https://example.test/pr/1' } }
-        end,
-      }
-    end)
 
     open_full_blame_popup()
 

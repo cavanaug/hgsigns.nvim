@@ -148,29 +148,13 @@ end
 
 --- @param result Hgsigns.BlameInfoPublic
 --- @param repo Hgsigns.Repo
---- @param with_gh boolean
 --- @return Hgsigns.LineSpec
-local function create_blame_title_linespec(result, repo, with_gh)
-  local gh --- @module 'hgsigns.gh'?
-  if config.gh and with_gh then
-    gh = require('hgsigns.gh')
-  end
-
-  local commit_url = gh and gh.commit_url(result.sha, repo.toplevel) or nil
-
+local function create_blame_title_linespec(result, repo)
   --- @type Hgsigns.LineSpec
   local title = {
     { result.abbrev_sha, 'Directory' },
     { ' ', 'NormalFloat' },
   }
-
-  if commit_url then
-    title[#title] = { result.abbrev_sha, 'Directory', commit_url }
-  end
-
-  if gh then
-    vim.list_extend(title, gh.create_pr_linespec(result.sha, repo.toplevel))
-  end
 
   vim.list_extend(title, {
     { result.author .. ' ', 'MoreMsg' },
@@ -205,12 +189,11 @@ return function(opts)
   end
 
   local lnum = api.nvim_win_get_cursor(0)[1]
-  local popup_winid, popup_bufnr
   ---@async
   local function is_stale()
     return not bcache:schedule()
-      or api.nvim_get_current_buf() ~= popup_bufnr
-        and (api.nvim_get_current_buf() ~= bufnr or api.nvim_win_get_cursor(0)[1] ~= lnum)
+      or api.nvim_get_current_buf() ~= bufnr
+      or api.nvim_win_get_cursor(0)[1] ~= lnum
   end
   local info = bcache:get_blame(lnum, opts)
   pcall(function()
@@ -233,27 +216,12 @@ return function(opts)
   local repo = bcache.git_obj.repo
   local body = opts.full and build_full_blame_body(bufnr, result, repo)
     or { { { result.summary, 'NormalFloat' } } }
-  local blame_linespec = { create_blame_title_linespec(result, repo, false) }
+  local blame_linespec = { create_blame_title_linespec(result, repo) }
   vim.list_extend(blame_linespec, body)
 
   if is_stale() then
     return
   end
 
-  popup_winid, popup_bufnr = popup.create(blame_linespec, config.preview_config, 'blame')
-
-  if not config.gh then
-    return
-  end
-
-  blame_linespec = { create_blame_title_linespec(result, repo, true) }
-  vim.list_extend(blame_linespec, body)
-
-  if is_stale() then
-    return
-  end
-
-  if api.nvim_win_is_valid(popup_winid) and api.nvim_buf_is_valid(popup_bufnr) then
-    popup.update(popup_winid, popup_bufnr, blame_linespec, config.preview_config)
-  end
+  popup.create(blame_linespec, config.preview_config, 'blame')
 end
