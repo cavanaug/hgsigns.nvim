@@ -46,3 +46,4 @@ tmp/
 .sidecar-start.sh
 .sidecar-base
 .td-root
+.tokensave
